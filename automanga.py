@@ -291,6 +291,9 @@ class File(object):
             file.write("\n")
         file.close()
 
+    def save_all(self):
+        self.save()
+
 class Directory(object):
     """A class for accessing files, or directories, in a directory as
     attributes on an object."""
@@ -299,6 +302,14 @@ class Directory(object):
         self._path = path
         self._nodes = [f for f in os.listdir(path) if "." not in f] if os.path.exists(path) else []
         self._opened_nodes = {}
+
+    def __iter__(self):
+        return self._opened_nodes.itervalues()
+
+    def __getitem__(self, name):
+        if name in self._nodes:
+            return getattr(self, name)
+        raise KeyError(name)
 
     def __getattr__(self, name):
         if name in self._nodes:
@@ -324,7 +335,23 @@ class Directory(object):
         os.rmdir(self.path())
 
     def save(self):
-        os.makedirs(self.path())
+        if not self.exists():
+            os.makedirs(self.path())
+
+    def save_all(self):
+        self.save()
+        for name, node in self._opened_nodes.items():
+            node.save_all()
+
+    def exists(self):
+        return os.path.exists(self.path())
+
+    def move(self, new_path):
+        if not self.exists() or os.path.exists(new_path):
+            return False
+        os.rename(self.path(), new_path)
+        self._path = new_path
+        return True
 
     def path(self, *name):
         return os.path.join(self._path, *name)
@@ -333,13 +360,13 @@ class Directory(object):
         if not os.path.exists(self.path(name)):
             self._nodes.append(name)
             self._opened_nodes[name] = Directory(self.path(name))
-        return self._opened_nodes[name]
+        return getattr(self, name)
 
     def add_file(self, name):
         if not os.path.exists(self.path(name)):
             self._nodes.append(name)
             self._opened_nodes[name] = File(self.path(name))
-        return self._opened_nodes[name]
+        return getattr(self, name)
 
 class Settings(object):
     def __init__(self):
@@ -395,44 +422,37 @@ class Settings(object):
 class Profile(object):
     def __init__(self, name):
         self.name = name
-        self.file = File(os.path.join(DIR_PROFILES, name))
-        if not self.file.mangas:
-            self.file.mangas = []
+        self.dir = Directory(os.path.join(DIR_PROFILES, name))
+        self.mangas = self.dir.add_dir("manga")
+        self.settings = self.dir.add_file("settings")
 
     def exists(self):
-        return self.file.exists()
+        return self.dir.exists()
 
     def delete(self):
-        os.remove(self.file.path)
+        self.dir.delete()
 
     def rename(self, new_name):
-        if self.exists():
-            new_path = os.path.join(DIR_PROFILES, new_name)
-            if os.path.exists(new_path):
-                return False
-            os.rename(self.file.path, new_path)
+        if not self.dir.move(os.path.join(DIR_PROFILES, new_name)):
+            return False
         self.name = new_name
         return True
 
     def save(self):
-        self.file.save()
+        self.dir.save_all()
 
-    def save_page(self, manga, page):
-        for n, m in enumerate(self.file.mangas):
-            manga_path = m.split("\t")[0]
-            if manga_path == manga.path:
-                self.file.mangas[n] = "%s\t%s" % (manga_path, page.name)
-                break
-        else:
-            self.file.mangas.append("%s\t%s" % (manga.path, page.name))
-        self.save()
+    def save_page(self, manga):
+        if manga.title() not in self.mangas:
+            self.mangas.add_file(manga.title())
+        file = self.mangas[manga.title()]
+        file.page = manga.mark
+        file.save()
 
     def load_manga(self, path):
-        self.file.last_read = path
-        for manga in self.file.mangas:
-            manga_path, page_name = manga.split("\t")
-            if manga_path == path:
-                return Manga(self, path, page_name)
+        self.settings.last_read = path
+        manga = path.rsplit("/", 1)[-1]
+        if manga in self.mangas:
+            return Manga(self, path, self.mangas[manga].page)
         return Manga(self, path)
 
 class Manga(object):
@@ -460,7 +480,7 @@ class Manga(object):
 
     def set_mark(self, page):
         self.mark = page
-        self.reader.save_page(self, page)
+        self.reader.save_page(self)
 
     def previous(self, page, step = 1):
         return Page(self, self.pages[max(0, self.pages.index(page) - step)])
