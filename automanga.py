@@ -39,8 +39,6 @@ def load_profile(name):
     global profile
     profile = Profile(name)
     settings.last_profile(profile.name)
-    if profile.exists():
-        output("Loaded profile '%s'" % profile.name)
 
 def output(msg):
     if not settings.silent():
@@ -227,8 +225,8 @@ class Reader(object):
             self.menu_bar.show()
 
 class File(object):
-    """Loads and parses a file and returns a File object from which
-    you can access the parsed sections as attributes"""
+    """A class for accessing the parsed content of a file as
+    attributes on an object."""
 
     def __init__(self, path, create = False): ## add autosync - save everytime an attribute is set - does not work well with list attributes
         self.path = path
@@ -273,7 +271,14 @@ class File(object):
     def exists(self):
         return os.path.exists(self.path)
 
+    def delete(self):
+        self.attributes = []
+        os.remove(self.path)
+
     def save(self):
+        dir = self.path.rsplit("/", 1)[0]
+        if not os.path.exists(dir):
+            os.makedirs(dir)
         file = open(self.path, "w")
         for attr in self.attributes:
             val = getattr(self, attr)
@@ -285,6 +290,56 @@ class File(object):
                 file.write(str(val) + "\n")
             file.write("\n")
         file.close()
+
+class Directory(object):
+    """A class for accessing files, or directories, in a directory as
+    attributes on an object."""
+
+    def __init__(self, path):
+        self._path = path
+        self._nodes = [f for f in os.listdir(path) if "." not in f] if os.path.exists(path) else []
+        self._opened_nodes = {}
+
+    def __getattr__(self, name):
+        if name in self._nodes:
+            if name not in self._opened_nodes:
+                if os.path.isdir(self.path(name)): self._opened_nodes[name] = Directory(self.path(name))
+                else:                              self._opened_nodes[name] = File(self.path(name))
+            return self._opened_nodes[name]
+        return object.__getattribute__(self, name)
+
+    def __delattr__(self, name):
+        if name in self._nodes:
+            self._nodes.remove(name)
+            if name in self._opened_nodes:
+                self._opened_nodes.pop(name).delete()
+        else:
+            object.__delattr__(self, name)
+
+    def delete(self):
+        for n in self._nodes:
+            getattr(self, n).delete()
+        self._opened_nodes = {}
+        self._nodes = []
+        os.rmdir(self.path())
+
+    def save(self):
+        os.makedirs(self.path())
+
+    def path(self, *name):
+        return os.path.join(self._path, *name)
+
+    def add_dir(self, name):
+        if not os.path.exists(self.path(name)):
+            self._nodes.append(name)
+            self._opened_nodes[name] = Directory(self.path(name))
+        return self._opened_nodes[name]
+
+    def add_file(self, name):
+        if not os.path.exists(self.path(name)):
+            self._nodes.append(name)
+            self._opened_nodes[name] = File(self.path(name))
+        return self._opened_nodes[name]
 
 class Settings(object):
     def __init__(self):
@@ -446,11 +501,15 @@ if __name__ == "__main__":
 
     if opts.profile:
         load_profile(opts.profile)
-        if not profile.exists():
+        if profile.exists():
+            output("Loaded profile '%s'" % profile.name)
+        else:
             profile.save()
             output("Created profile '%s'" % profile.name)
     else:
-        if not settings.load_last_profile():
+        if settings.load_last_profile():
+            output("No profile specified - loading '%s'" % profile.name)
+        else:
             user = home.split("/")[-1]
             output("No profile exists - creating one for '%s'" % user)
             load_profile(user)
