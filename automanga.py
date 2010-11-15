@@ -306,6 +306,9 @@ class Directory(object):
     def __iter__(self):
         return self._opened_nodes.itervalues()
 
+    def __contains__(self, name):
+        return name in self._nodes
+
     def __getitem__(self, name):
         if name in self._nodes:
             return getattr(self, name)
@@ -445,7 +448,7 @@ class Profile(object):
         if manga.title() not in self.mangas:
             self.mangas.add_file(manga.title())
         file = self.mangas[manga.title()]
-        file.page = manga.mark
+        file.page = manga.mark.name
         file.save()
 
     def load_manga(self, path):
