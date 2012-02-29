@@ -198,3 +198,6 @@ class library(lib.library):
             pno += 1
             ls = self.alphapage(pno)
             i = 0
+
+    def __iter__(self):
+        raise NotImplementedError("mangafox iterator")
