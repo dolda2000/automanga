@@ -11,12 +11,6 @@ class imgstream(object):
     def close(self):
         self.bk.close()
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc_info):
-        self.close()
-
     def read(self, sz = None):
         if sz is None:
             return self.bk.read()
