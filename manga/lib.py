@@ -15,7 +15,18 @@ class library(object):
         Not all libraries need implement this."""
         raise NotImplementedError("manga.lib.library iterator")
 
-class pagelist(object):
+class pagetree(object):
+    """Base class for objects in the tree of pages and pagelists.
+
+    All pagetree objects should contain an attribute `stack', contains
+    a list of pairs. The last pair in the list should be the pagetree
+    object which yielded this pagetree object, along with the index
+    which yielded it. Every non-last pair should be the same
+    information for the pair following it. The only objects with empty
+    `stack' lists should be `manga' objects."""
+    pass
+
+class pagelist(pagetree):
     """Class representing a list of either pages, or nested
     pagelists. Might be, for instance, a volume or a chapter.
 
@@ -43,7 +54,7 @@ class manga(pagelist):
     and all constraints valid for it."""
     pass
 
-class page(object):
+class page(pagetree):
     """Class representing a single page of a manga. Pages make up the
     leaf nodes of a pagelist tree.
 

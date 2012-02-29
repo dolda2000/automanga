@@ -18,7 +18,8 @@ class imgstream(lib.imgstream):
             return self.bk.read(sz)
 
 class page(lib.page):
-    def __init__(self, chapter, n, url):
+    def __init__(self, chapter, stack, n, url):
+        self.stack = stack
         self.chapter = chapter
         self.volume = self.chapter.volume
         self.manga = self.volume.manga
@@ -36,7 +37,8 @@ class page(lib.page):
         return imgstream(self.iurl())
 
 class chapter(lib.pagelist):
-    def __init__(self, volume, name, url):
+    def __init__(self, volume, stack, name, url):
+        self.stack = stack
         self.volume = volume
         self.manga = volume.manga
         self.name = name
@@ -58,7 +60,7 @@ class chapter(lib.pagelist):
             m = l.contents[2].strip()
             if m[:3] != u"of ":
                 raise Exception("parse error: weird page list for %r" % self)
-            self.cpag = [page(self, n + 1, self.url + ("%i.html" % (n + 1))) for n in xrange(int(m[3:]))]
+            self.cpag = [page(self, self.stack + [(self, n)], n + 1, self.url + ("%i.html" % (n + 1))) for n in xrange(int(m[3:]))]
         return self.cpag
 
     def __str__(self):
@@ -68,7 +70,8 @@ class chapter(lib.pagelist):
         return "<mangafox.chapter %r.%r.%r>" % (self.manga.name, self.volume.name, self.name)
 
 class volume(lib.pagelist):
-    def __init__(self, manga, name):
+    def __init__(self, manga, stack, name):
+        self.stack = stack
         self.manga = manga
         self.name = name
         self.ch = []
@@ -97,6 +100,7 @@ class manga(lib.manga):
         self.name = name
         self.url = url
         self.cvol = None
+        self.stack = []
 
     def __getitem__(self, i):
         return self.vols()[i]
@@ -109,12 +113,12 @@ class manga(lib.manga):
             page = soup(htcache.fetch(self.url))
             vls = page.find("div", id="chapters").findAll("div", attrs={"class": "slide"})
             self.cvol = []
-            for i in xrange(len(vls)):
-                vol = volume(self, vls[i].find("h3", attrs={"class": "volume"}).contents[0].strip())
-                cls = nextel(vls[i])
+            for i, vn in enumerate(reversed(vls)):
+                vol = volume(self, [(self, i)], vn.find("h3", attrs={"class": "volume"}).contents[0].strip())
+                cls = nextel(vn)
                 if cls.name != u"ul" or cls["class"] != u"chlist":
                     raise Exception("parse error: weird volume list for %r" % self)
-                for ch in cls.findAll("li"):
+                for o, ch in enumerate(reversed(cls.findAll("li"))):
                     n = ch.div.h3 or ch.div.h4
                     name = n.a.string
                     for span in ch("span"):
@@ -126,8 +130,8 @@ class manga(lib.manga):
                     url = n.a["href"].encode("us-ascii")
                     if url[-7:] != "/1.html":
                         raise Exception("parse error: unexpected chapter URL for %r: %s" % (self, url))
-                    vol.ch.insert(0, chapter(vol, name, url[:-6]))
-                self.cvol.insert(0, vol)
+                    vol.ch.append(chapter(vol, vol.stack + [(vol, o)], name, url[:-6]))
+                self.cvol.append(vol)
         return self.cvol
 
     def __str__(self):
