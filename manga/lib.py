@@ -9,6 +9,13 @@ class library(object):
         All libraries should implement this."""
         raise NotImplementedError()
 
+    def byid(self, id):
+        """Returns a previously known manga by its string ID, or
+        raises KeyError if no such manga could be found.
+
+        All libraries should implement this."""
+        raise KeyError(id)
+
     def __iter__(self):
         """Return an iterator of all known mangas in this library.
 
@@ -18,13 +25,30 @@ class library(object):
 class pagetree(object):
     """Base class for objects in the tree of pages and pagelists.
 
-    All pagetree objects should contain an attribute `stack', contains
-    a list of pairs. The last pair in the list should be the pagetree
-    object which yielded this pagetree object, along with the index
-    which yielded it. Every non-last pair should be the same
+    All pagetree objects should contain an attribute `stack',
+    containing a list of pairs. The last pair in the list should be
+    the pagetree object which yielded this pagetree object, along with
+    the index which yielded it. Every non-last pair should be the same
     information for the pair following it. The only objects with empty
-    `stack' lists should be `manga' objects."""
-    pass
+    `stack' lists should be `manga' objects.
+    
+    All non-root pagetree objects should also contain an attribute
+    `id', which should be a string that can be passed to the `byid'
+    function of its parent node to recover the node. Such string ID
+    should be more persistent than the node's numeric index in the
+    parent."""
+    
+    def idlist(self):
+        """Returns a list of the IDs necessary to resolve this node
+        from the root node."""
+        if len(self.stack) == 0:
+            raise Exception("Cannot get ID list on root node.")
+        return [n.id for n, i in self.stack[1:]] + [self.id]
+
+    def byidlist(self, idlist):
+        if len(idlist) == 0:
+            return self
+        return self.byid(idlist[0]).byidlist(idlist[1:])
 
 class pagelist(pagetree):
     """Class representing a list of either pages, or nested
@@ -49,9 +73,25 @@ class pagelist(pagetree):
         All pagelists need to implement this."""
         raise NotImplementedError()
 
+    def byid(self, id):
+        """Return the direct sub-node of this pagelist which has the
+        given string ID. If none is found, a KeyError is raised.
+
+        This default method iterates the children of this node, but
+        may be overridden by some more efficient implementation.
+        """
+        for ch in self:
+            if ch.id == id:
+                return ch
+        raise KeyError(id)
+
 class manga(pagelist):
     """Class reprenting a single manga. Includes the pagelist class,
-    and all constraints valid for it."""
+    and all constraints valid for it.
+
+    A manga is a root pagetree node, but should also contain an `id'
+    attribute, which can be used to recover the manga from its
+    library's `byid' function."""
     pass
 
 class page(pagetree):

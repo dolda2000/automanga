@@ -24,6 +24,7 @@ class page(lib.page):
         self.volume = self.chapter.volume
         self.manga = self.volume.manga
         self.n = n
+        self.id = str(n)
         self.url = url
         self.ciurl = None
 
@@ -37,10 +38,11 @@ class page(lib.page):
         return imgstream(self.iurl())
 
 class chapter(lib.pagelist):
-    def __init__(self, volume, stack, name, url):
+    def __init__(self, volume, stack, id, name, url):
         self.stack = stack
         self.volume = volume
         self.manga = volume.manga
+        self.id = id
         self.name = name
         self.url = url
         self.cpag = None
@@ -70,9 +72,10 @@ class chapter(lib.pagelist):
         return "<mangafox.chapter %r.%r.%r>" % (self.manga.name, self.volume.name, self.name)
 
 class volume(lib.pagelist):
-    def __init__(self, manga, stack, name):
+    def __init__(self, manga, stack, id, name):
         self.stack = stack
         self.manga = manga
+        self.id = id
         self.name = name
         self.ch = []
 
@@ -95,8 +98,9 @@ def nextel(el):
             return el
 
 class manga(lib.manga):
-    def __init__(self, lib, name, url):
+    def __init__(self, lib, id, name, url):
         self.lib = lib
+        self.id = id
         self.name = name
         self.url = url
         self.cvol = None
@@ -114,13 +118,16 @@ class manga(lib.manga):
             vls = page.find("div", id="chapters").findAll("div", attrs={"class": "slide"})
             self.cvol = []
             for i, vn in enumerate(reversed(vls)):
-                vol = volume(self, [(self, i)], vn.find("h3", attrs={"class": "volume"}).contents[0].strip())
+                name = vn.find("h3", attrs={"class": "volume"}).contents[0].strip()
+                vid = name.encode("utf8")
+                vol = volume(self, [(self, i)], vid, name)
                 cls = nextel(vn)
                 if cls.name != u"ul" or cls["class"] != u"chlist":
                     raise Exception("parse error: weird volume list for %r" % self)
                 for o, ch in enumerate(reversed(cls.findAll("li"))):
                     n = ch.div.h3 or ch.div.h4
                     name = n.a.string
+                    chid = name.encode("utf8")
                     for span in ch("span"):
                         try:
                             if u" title " in (u" " + span["class"] + u" "):
@@ -130,7 +137,7 @@ class manga(lib.manga):
                     url = n.a["href"].encode("us-ascii")
                     if url[-7:] != "/1.html":
                         raise Exception("parse error: unexpected chapter URL for %r: %s" % (self, url))
-                    vol.ch.append(chapter(vol, vol.stack + [(vol, o)], name, url[:-6]))
+                    vol.ch.append(chapter(vol, vol.stack + [(vol, o)], chid, name, url[:-6]))
                 self.cvol.append(vol)
         return self.cvol
 
@@ -151,11 +158,14 @@ class library(lib.library):
         page = soup(htcache.fetch(self.base + ("directory/%i.htm?az" % pno)))
         ls = page.find("div", id="mangalist").find("ul", attrs={"class": "list"}).findAll("li")
         ret = []
+        ubase = self.base + "manga/"
         for m in ls:
             t = m.find("div", attrs={"class": "manga_text"}).find("a", attrs={"class": "title"})
             name = t.string
             url = t["href"].encode("us-ascii")
-            ret.append(manga(self, name, url))
+            if url[:len(ubase)] != ubase or url.find('/', len(ubase)) != (len(url) - 1):
+                raise Exception("parse error: unexpected manga URL for %r: %s" % (name, url))
+            ret.append(manga(self, url[len(ubase):-1], name, url))
         return ret
 
     def alphapages(self):
@@ -196,6 +206,15 @@ class library(lib.library):
             pno += 1
             ls = self.alphapage(pno)
             i = 0
+
+    def byid(self, id):
+        url = self.base + ("manga/%s/" % id)
+        page = soup(htcache.fetch(url))
+        if page.find("div", id="title") is None:
+            # Assume we got the search page
+            raise KeyError(id)
+        name = page.find("div", id="series_info").find("div", attrs={"class": "cover"}).img["alt"]
+        return manga(self, id, name, url)
 
     def __iter__(self):
         raise NotImplementedError("mangafox iterator")
