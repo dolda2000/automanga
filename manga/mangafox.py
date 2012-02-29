@@ -3,7 +3,7 @@ import BeautifulSoup
 import lib, htcache
 soup = BeautifulSoup.BeautifulSoup
 
-class imgstream(object):
+class imgstream(lib.imgstream):
     def __init__(self, url):
         self.bk = urllib.urlopen(url)
         self.ctype = self.bk.info()["Content-Type"]
