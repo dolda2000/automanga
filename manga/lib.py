@@ -92,30 +92,30 @@ class imgstream(object):
         stream of SZ is not given."""
         raise NotImplementedError()
 
-class pageiter(object):
-    def __init__(self, root):
-        self.nstack = [0]
-        self.lstack = [root]
+class cursor(object):
+    def __init__(self, ob):
+        self.cur = self.descend(ob)
+
+    def descend(self, ob):
+        while isinstance(ob, pagelist):
+            ob = ob[0]
+        if not isinstance(ob, page):
+            raise TypeError("object in page tree was unexpectedly not a pagetree")
+        return ob
 
     def next(self):
-        while True:
-            if len(self.nstack) == 0:
-                raise StopIteration
-            try:
-                node = self.lstack[-1][self.nstack[-1]]
-            except IndexError:
-                self.lstack.pop()
-                self.nstack.pop()
-                if len(self.nstack) > 0:
-                    self.nstack[-1] += 1
-                continue
-            if isinstance(node, page):
-                nl = tuple(self.nstack)
-                self.nstack[-1] += 1
-                return nl, node
-            elif isinstance(node, pagelist):
-                self.lstack.append(node)
-                self.nstack.append(0)
+        for n, i in reversed(self.cur.stack):
+            if i < len(n) - 1:
+                self.cur = self.descend(n[i + 1])
+                return self.cur
+        raise StopIteration()
+
+    def prev(self):
+        for n, i in reversed(self.cur,stack):
+            if i > 0:
+                self.cur = self.descend(n[i - 1])
+                return self.cur
+        raise StopIteration()
 
     def __iter__(self):
         return self
