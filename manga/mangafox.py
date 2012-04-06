@@ -152,7 +152,7 @@ def libalphacmp(a, b):
 
 class library(lib.library):
     def __init__(self):
-        self.base = "http://www.mangafox.com/"
+        self.base = "http://mangafox.me/"
 
     def alphapage(self, pno):
         page = soup(htcache.fetch(self.base + ("directory/%i.htm?az" % pno)))
