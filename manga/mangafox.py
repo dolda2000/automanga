@@ -8,6 +8,9 @@ class imgstream(lib.imgstream):
         self.bk = urllib.urlopen(url)
         self.ctype = self.bk.info()["Content-Type"]
 
+    def fileno(self):
+        return self.bk.fileno()
+
     def close(self):
         self.bk.close()
 

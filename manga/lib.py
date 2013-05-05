@@ -123,6 +123,12 @@ class imgstream(object):
     def __exit__(self, *exc_info):
         self.close()
 
+    def fileno(self):
+        """If reading the imgstream may block, fileno() should return
+        a file descriptor that can be polled. If fileno() returns
+        None, that should mean that reading will not block."""
+        return None
+
     def close(self):
         """Close this stream."""
         raise NotImplementedError()
