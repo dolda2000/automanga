@@ -134,7 +134,10 @@ class imgstream(object):
 
 class cursor(object):
     def __init__(self, ob):
-        self.cur = self.descend(ob)
+        if isinstance(ob, cursor):
+            self.cur = ob.cur
+        else:
+            self.cur = self.descend(ob)
 
     def descend(self, ob):
         while isinstance(ob, pagelist):
