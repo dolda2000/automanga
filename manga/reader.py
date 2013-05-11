@@ -10,18 +10,49 @@ class future(threading.Thread):
         super(future, self).__init__()
         self._val = None
         self._exc = None
-        self.start()
+        self._notlist = []
+        self._started = False
+
+    def start(self):
+        if not self._started:
+            super(future, self).start()
+            self._started = True
 
     def run(self):
         try:
             val = self.value()
         except Exception as e:
-            self._exc = e
+            with gtk.gdk.lock:
+                self._exc = e
+                for cb in self._notlist:
+                    cb()
+                self._notlist = []
         else:
-            self._val = [val]
+            with gtk.gdk.lock:
+                self._val = [val]
+                for cb in self._notlist:
+                    cb()
+                self._notlist = []
+
+    # Caller must hold GDK lock
+    def notify(self, cb):
+        self.start()
+        if not self.done:
+            self._notlist.append(cb)
+        else:
+            cb()
+
+    def progcb(self):
+        with gtk.gdk.lock:
+            nls = []
+            for cb in self._notlist:
+                if cb():
+                    nls.append(cb)
+            self._notlist = nls
 
     @property
     def val(self):
+        self.start()
         if self._exc is not None:
             raise self._exc
         if self._val is None:
@@ -30,13 +61,21 @@ class future(threading.Thread):
 
     @property
     def done(self):
+        self.start()
         return self._exc != None or self._val != None
+
+    def wait(self):
+        self.start()
+        while self.is_alive():
+            self.join()
+        return self.val
 
 class imgload(future):
     def __init__(self, page):
+        super(imgload, self).__init__()
         self.page = page
         self.st = None
-        super(imgload, self).__init__()
+        self.start()
 
     def value(self):
         buf = bytearray()
@@ -49,6 +88,7 @@ class imgload(future):
                     break
                 self.p += len(read)
                 buf.extend(read)
+                self.progcb()
         self.st = None
         return gtk.gdk.pixbuf_new_from_stream(gio.memory_input_stream_new_from_data(str(buf)))
 
@@ -57,6 +97,58 @@ class imgload(future):
         if self.st is None or self.st.clen is None:
             return None
         return float(self.p) / float(self.st.clen)
+
+class pagecache(object):
+    def __init__(self, sz=50):
+        self.sz = sz
+        self.bk = []
+
+    def __getitem__(self, page):
+        idl = page.idlist()
+        for ol, f in self.bk:
+            if ol == idl:
+                return f
+        f = imgload(page)
+        self.bk.append((idl, f))
+        if len(self.bk) > self.sz:
+            self.bk = self.bk[-sz:]
+        return f
+
+class relpageget(future):
+    def __init__(self, cur, prev, cache=None):
+        super(relpageget, self).__init__()
+        self.cur = lib.cursor(cur)
+        self.prev = prev
+        self.cache = cache
+        self.start()
+
+    def value(self):
+        try:
+            if self.prev:
+                page = self.cur.prev()
+            else:
+                page = self.cur.next()
+        except StopIteration:
+            page = None
+        else:
+            if self.cache:
+                self.cache[page]
+        return page
+
+class pageget(future):
+    def __init__(self, fnode):
+        super(pageget, self).__init__()
+        self.fnode = fnode
+        self.start()
+
+    def value(self):
+        return lib.cursor(self.fnode).cur
+
+class ccursor(object):
+    def __init__(self, ob, cache=None):
+        self.cur = lib.cursor(ob)
+        self.prev = relpageget(self.cur, True, cache)
+        self.next = relpageget(self.cur, False, cache)
 
 class pageview(gtk.Widget):
     def __init__(self, pixbuf):
@@ -170,33 +262,162 @@ class pageview(gtk.Widget):
         self.set_off((ox, oy))
 gobject.type_register(pageview)
 
+class pagefetch(object):
+    def __init__(self, fpage):
+        self.pg = fpage
+
+    def attach(self, reader):
+        self.rd = reader
+        self.msg = gtk.Alignment(0, 0.5, 0, 0)
+        self.hlay = gtk.HBox()
+        self.lbl = gtk.Label("Fetching page...")
+        self.hlay.pack_start(self.lbl)
+        self.lbl.show()
+        self.msg.add(self.hlay)
+        self.hlay.show()
+        self.rd.sbar.pack_start(self.msg)
+        self.msg.show()
+
+        self.pg.notify(self.haspage)
+
+    def haspage(self):
+        if self.rd.pagefetch.cur != self: return False
+        if not self.pg.done:
+            return True
+        if self.pg.val is not None:
+            self.rd.setpage(self.pg.val)
+        self.rd.pagefetch.set(None)
+
+    def abort(self):
+        self.rd.sbar.remove(self.msg)
+
+class imgfetch(object):
+    def __init__(self, fimage):
+        self.img = fimage
+        self.upd = False
+        self.error = None
+
+    def attach(self, reader):
+        self.rd = reader
+        self.msg = gtk.Alignment(0, 0.5, 0, 0)
+        self.hlay = gtk.HBox()
+        self.lbl = gtk.Label("Fetching image...")
+        self.hlay.pack_start(self.lbl)
+        self.lbl.show()
+        self.prog = gtk.ProgressBar()
+        self.prog.set_fraction(0.0)
+        self.hlay.pack_start(self.prog)
+        self.prog.show()
+        self.msg.add(self.hlay)
+        self.hlay.show()
+        self.rd.sbar.pack_start(self.msg)
+        self.msg.show()
+
+        self.img.notify(self.imgprog)
+
+    def imgprog(self):
+        if self.rd.imgfetch.cur != self: return False
+        if self.img.done:
+            try:
+                img = self.img.val
+            except Exception as e:
+                self.error = str(e)
+            else:
+                self.rd.setimg(img)
+                self.upd = True
+            self.rd.imgfetch.set(None)
+        else:
+            p = self.img.prog
+            if p: self.prog.set_fraction(p)
+            return True
+
+    def abort(self):
+        self.rd.sbar.remove(self.msg)
+        if not self.upd:
+            self.rd.setimg(None)
+            if self.error is not None:
+                self.rd.pagelbl.set_text("Error fetching image: " + self.error)
+
+class procslot(object):
+    __slots__ = ["cur", "p"]
+    def __init__(self, p):
+        self.cur = None
+        self.p = p
+
+    def set(self, proc):
+        if self.cur is not None:
+            self.cur.abort()
+            self.cur = None
+        if proc is not None:
+            self.cur = proc
+            try:
+                proc.attach(self.p)
+            except:
+                self.cur = None
+                raise
+
 class reader(gtk.Window):
     def __init__(self, manga):
         super(reader, self).__init__(gtk.WINDOW_TOPLEVEL)
         self.connect("delete_event",    lambda wdg, ev, data=None: False)
         self.connect("destroy",         lambda wdg, data=None:     self.quit())
         self.connect("key_press_event", self.key)
+        self.cache = pagecache()
+        self.pagefetch = procslot(self)
+        self.imgfetch = procslot(self)
+
+        vlay = gtk.VBox()
         self.pfr = gtk.Frame(None)
         self.pfr.set_shadow_type(gtk.SHADOW_NONE)
-        self.add(self.pfr)
+        vlay.pack_start(self.pfr)
         self.pfr.show()
+        self.sbar = gtk.HBox()
+        self.pagelbl = gtk.Label("")
+        algn = gtk.Alignment(0, 0.5, 0, 0)
+        algn.add(self.pagelbl)
+        self.pagelbl.show()
+        self.sbar.pack_start(algn)
+        algn.show()
+        vlay.pack_end(self.sbar, False)
+        self.sbar.show()
+        self.add(vlay)
+        vlay.show()
 
         self.manga = manga
         self.page = None
-        self.cursor = lib.cursor(manga)
-        self.setpage(self.cursor.cur)
+        self.fetchpage(pageget(self.manga))
         self.updtitle()
+        self.point = None
 
-    def setpage(self, page):
+    def updpagelbl(self):
+        if self.page is None:
+            self.pagelbl.set_text("")
+        else:
+            w, h = self.page.get_osize()
+            self.pagelbl.set_text(u"%s\u00d7%s (%d%%)" % (w, h, int(self.page.zoom * 100)))
+
+    def setimg(self, img):
         if self.page is not None:
             self.pfr.remove(self.page)
             self.page = None
-        if page is not None:
-            with self.cursor.cur.open() as inp:
-                pb = gtk.gdk.pixbuf_new_from_stream(gio.memory_input_stream_new_from_data(inp.read()))
-            self.page = pageview(pb)
+        if img is not None:
+            self.page = pageview(img)
             self.pfr.add(self.page)
             self.page.show()
+        self.updpagelbl()
+
+    def setpage(self, page):
+        if self.point is not None:
+            self.point = None
+        if page is not None:
+            self.point = ccursor(page, self.cache)
+            self.imgfetch.set(imgfetch(self.cache[page]))
+        else:
+            self.setimg(None)
+
+    def fetchpage(self, fpage):
+        self.imgfetch.set(None)
+        self.pagefetch.set(pagefetch(fpage))
 
     def updtitle(self):
         self.set_title(u"Automanga \u2013 " + self.manga.name)
@@ -207,6 +428,7 @@ class reader(gtk.Window):
     @zoom.setter
     def zoom(self, zoom):
         self.page.set_zoom(zoom)
+        self.updpagelbl()
 
     def pan(self, off):
         ox, oy = self.page.off
@@ -214,36 +436,42 @@ class reader(gtk.Window):
         self.page.set_off((ox + px, oy + py))
 
     def key(self, wdg, ev, data=None):
-        if ev.keyval in [ord('Q'), ord('q'), 65307]:
+        if ev.keyval in [ord('Q'), ord('q')]:
             self.quit()
-        if ev.keyval in [ord('O'), ord('o')]:
-            self.zoom = 1.0
-        elif ev.keyval in [ord('P'), ord('p')]:
-            self.zoom = None
-        elif ev.keyval in [ord('[')]:
-            self.zoom = min(self.zoom * 1.25, 3)
-        elif ev.keyval in [ord(']')]:
-            self.zoom /= 1.25
-        elif ev.keyval in [ord('h')]:
-            self.pan((-100, 0))
-        elif ev.keyval in [ord('j')]:
-            self.pan((0, 100))
-        elif ev.keyval in [ord('k')]:
-            self.pan((0, -100))
-        elif ev.keyval in [ord('l')]:
-            self.pan((100, 0))
-        elif ev.keyval in [ord('H')]:
-            self.page.set_off((0, self.page.off[1]))
-        elif ev.keyval in [ord('J')]:
-            self.page.set_off((self.page.off[0], self.page.get_asize()[1]))
-        elif ev.keyval in [ord('K')]:
-            self.page.set_off((self.page.off[1], 0))
-        elif ev.keyval in [ord('L')]:
-            self.page.set_off((self.page.get_asize()[0], self.page.off[1]))
-        elif ev.keyval in [ord(' ')]:
-            self.setpage(self.cursor.next())
-        elif ev.keyval in [65288]:
-            self.setpage(self.cursor.prev())
+        elif ev.keyval in [65307]:
+            if self.page is not None:
+                self.pagefetch.set(None)
+            self.imgfetch.set(None)
+        if self.page is not None:
+            if ev.keyval in [ord('O'), ord('o')]:
+                self.zoom = 1.0
+            elif ev.keyval in [ord('P'), ord('p')]:
+                self.zoom = None
+            elif ev.keyval in [ord('[')]:
+                self.zoom = min(self.zoom * 1.25, 3)
+            elif ev.keyval in [ord(']')]:
+                self.zoom /= 1.25
+            elif ev.keyval in [ord('h')]:
+                self.pan((-100, 0))
+            elif ev.keyval in [ord('j')]:
+                self.pan((0, 100))
+            elif ev.keyval in [ord('k')]:
+                self.pan((0, -100))
+            elif ev.keyval in [ord('l')]:
+                self.pan((100, 0))
+            elif ev.keyval in [ord('H')]:
+                self.page.set_off((0, self.page.off[1]))
+            elif ev.keyval in [ord('J')]:
+                self.page.set_off((self.page.off[0], self.page.get_asize()[1]))
+            elif ev.keyval in [ord('K')]:
+                self.page.set_off((self.page.off[1], 0))
+            elif ev.keyval in [ord('L')]:
+                self.page.set_off((self.page.get_asize()[0], self.page.off[1]))
+        if self.point is not None:
+            if ev.keyval in [ord(' ')]:
+                self.fetchpage(self.point.next)
+            elif ev.keyval in [65288]:
+                self.fetchpage(self.point.prev)
 
     def quit(self):
         self.hide()
