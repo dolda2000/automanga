@@ -247,4 +247,5 @@ class reader(gtk.Window):
 
     def quit(self):
         self.hide()
+        gtk.main_quit()
 gobject.type_register(reader)
