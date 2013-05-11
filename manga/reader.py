@@ -391,6 +391,58 @@ class procslot(object):
                 self.cur = None
                 raise
 
+class plistget(future):
+    def __init__(self, node):
+        super(plistget, self).__init__()
+        self.node = node
+
+    def value(self):
+        return list(self.node)
+
+class loadplist(object):
+    def __init__(self, pnode):
+        self.pnode = pnode
+        self.flist = plistget(self.pnode)
+
+    def attach(self, sbox):
+        self.sbox = sbox
+        self.flist.notify(self.haslist)
+
+    def haslist(self):
+        if self.sbox.loadlist.cur != self: return False
+        if not self.flist.done: return True
+        self.sbox.setlist(self.flist.val)
+
+class sbox(gtk.ComboBox):
+    def __init__(self, reader, ptnode):
+        super(sbox, self).__init__()
+        self.rd = reader
+        self.node = ptnode
+        self.pnode, self.pidx = self.node.stack[-1]
+
+        self.bk = gtk.ListStore(str)
+        self.set_model(self.bk)
+        cell = gtk.CellRendererText()
+        self.pack_start(cell, True)
+        self.add_attribute(cell, "text", 0)
+        self.set_active(0)
+
+        self.set_sensitive(False)
+        self.bk.append([ptnode.name])
+        self.loadlist = procslot(self)
+        self.loadlist.set(loadplist(self.pnode))
+
+    def setlist(self, ls):
+        self.bk.clear()
+        for i, ch in enumerate(ls):
+            self.bk.append([ch.name])
+        self.set_active(self.pidx)
+        self.set_sensitive(True)
+        self.connect("changed", self.changed_cb)
+
+    def changed_cb(self, wdg, data=None):
+        self.rd.fetchpage(pageget(self.pnode[self.get_active()]))
+
 class reader(gtk.Window):
     def __init__(self, manga):
         super(reader, self).__init__(gtk.WINDOW_TOPLEVEL)
@@ -402,11 +454,25 @@ class reader(gtk.Window):
         self.imgfetch = procslot(self)
         self.preload = procslot(self)
 
+        self.manga = manga
+        self.page = None
+        self.sboxes = []
+        self.point = None
+
         vlay = gtk.VBox()
         self.pfr = gtk.Frame(None)
         self.pfr.set_shadow_type(gtk.SHADOW_NONE)
         vlay.pack_start(self.pfr)
         self.pfr.show()
+        self.sboxbar = gtk.HBox()
+        algn = gtk.Alignment(0, 0.5, 0, 0)
+        sboxlbl = gtk.Label(self.manga.name + u": ")
+        algn.add(sboxlbl)
+        sboxlbl.show()
+        self.sboxbar.pack_start(algn, False)
+        algn.show()
+        vlay.pack_start(self.sboxbar, False)
+        self.sboxbar.show()
         self.sbar = gtk.HBox()
         self.pagelbl = gtk.Label("")
         algn = gtk.Alignment(0, 0.5, 0, 0)
@@ -419,11 +485,8 @@ class reader(gtk.Window):
         self.add(vlay)
         vlay.show()
 
-        self.manga = manga
-        self.page = None
         self.fetchpage(pageget(self.manga))
         self.updtitle()
-        self.point = None
 
     def updpagelbl(self):
         if self.page is None:
@@ -431,6 +494,22 @@ class reader(gtk.Window):
         else:
             w, h = self.page.get_osize()
             self.pagelbl.set_text(u"%s\u00d7%s (%d%%)" % (w, h, int(self.page.zoom * 100)))
+
+    def updsboxes(self, page):
+        nodes = [node for node, idx in page.stack[1:]] + [page]
+        l = min(len(self.sboxes), len(nodes))
+        for i, (pbox, node) in enumerate(zip(self.sboxes, nodes)):
+            if pbox.node != node:
+                l = i
+                break
+        for i in xrange(l, len(self.sboxes)):
+            self.sboxbar.remove(self.sboxes[i])
+        self.sboxes = self.sboxes[:l]
+        for i in xrange(l, len(nodes)):
+            new = sbox(self, nodes[i])
+            self.sboxbar.pack_start(new, False, padding=5)
+            self.sboxes.append(new)
+            new.show()
 
     def setimg(self, img):
         if self.page is not None:
@@ -450,6 +529,7 @@ class reader(gtk.Window):
             self.imgfetch.set(imgfetch(self.cache[page]))
         else:
             self.setimg(None)
+        self.updsboxes(page)
 
     def fetchpage(self, fpage, setcb=None):
         self.imgfetch.set(None)
