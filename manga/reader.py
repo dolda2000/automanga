@@ -24,16 +24,22 @@ class future(threading.Thread):
             val = self.value()
         except Exception as e:
             with gtk.gdk.lock:
-                self._exc = e
-                for cb in self._notlist:
-                    cb()
-                self._notlist = []
+                try:
+                    self._exc = e
+                    for cb in self._notlist:
+                        cb()
+                    self._notlist = []
+                finally:
+                    gtk.gdk.flush()
         else:
             with gtk.gdk.lock:
-                self._val = [val]
-                for cb in self._notlist:
-                    cb()
-                self._notlist = []
+                try:
+                    self._val = [val]
+                    for cb in self._notlist:
+                        cb()
+                    self._notlist = []
+                finally:
+                    gtk.gdk.flush()
 
     # Caller must hold GDK lock
     def notify(self, cb):
@@ -45,11 +51,14 @@ class future(threading.Thread):
 
     def progcb(self):
         with gtk.gdk.lock:
-            nls = []
-            for cb in self._notlist:
-                if cb():
-                    nls.append(cb)
-            self._notlist = nls
+            try:
+                nls = []
+                for cb in self._notlist:
+                    if cb():
+                        nls.append(cb)
+                self._notlist = nls
+            finally:
+                gtk.gdk.flush()
 
     @property
     def val(self):
@@ -112,7 +121,7 @@ class pagecache(object):
         f = imgload(page)
         self.bk.append((idl, f))
         if len(self.bk) > self.sz:
-            self.bk = self.bk[-sz:]
+            self.bk = self.bk[-self.sz:]
         return f
 
 class relpageget(future):
@@ -185,7 +194,8 @@ class pageview(gtk.Widget):
         self.window.set_user_data(None)
 
     def do_size_request(self, req):
-        req.width, req.height = self.get_osize()
+        w, h = self.get_osize()
+        req.width, req.height = max(min(w, 4096), 0), max(min(h, 4096), 0)
 
     def fitzoom(self):
         w, h = self.get_osize()
@@ -428,6 +438,7 @@ class sbox(gtk.ComboBox):
         self.set_active(0)
 
         self.set_sensitive(False)
+        self.set_focus_on_click(False)
         self.bk.append([ptnode.name])
         self.loadlist = procslot(self)
         self.loadlist.set(loadplist(self.pnode))
@@ -435,7 +446,7 @@ class sbox(gtk.ComboBox):
     def setlist(self, ls):
         self.bk.clear()
         for i, ch in enumerate(ls):
-            self.bk.append([ch.name])
+            self.bk.append(["%i/%i: %s" % (i + 1, len(ls), ch.name)])
         self.set_active(self.pidx)
         self.set_sensitive(True)
         self.connect("changed", self.changed_cb)
