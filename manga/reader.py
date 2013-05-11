@@ -263,23 +263,41 @@ class pageview(gtk.Widget):
         self.set_off((ox, oy))
 gobject.type_register(pageview)
 
-class pagefetch(object):
-    def __init__(self, fpage, setcb=None):
-        self.pg = fpage
-        self.setcb = setcb
-
+class msgproc(object):
     def attach(self, reader):
         self.rd = reader
         self.msg = gtk.Alignment(0, 0.5, 0, 0)
         self.hlay = gtk.HBox()
-        self.lbl = gtk.Label("Fetching page...")
+        self.lbl = gtk.Label("")
         self.hlay.pack_start(self.lbl)
         self.lbl.show()
         self.msg.add(self.hlay)
         self.hlay.show()
         self.rd.sbar.pack_start(self.msg)
         self.msg.show()
+        self._prog = None
 
+    def prog(self, p):
+        if p is not None and self._prog is None:
+            self._prog = gtk.ProgressBar()
+            self._prog.set_fraction(p)
+            self.hlay.pack_start(self._prog, padding=5)
+            self._prog.show()
+        elif p is None and self._prog is not None:
+            self.hlay.remove(self._prog)
+            self._prog = None
+
+    def abort(self):
+        self.rd.sbar.remove(self.msg)
+
+class pagefetch(msgproc):
+    def __init__(self, fpage, setcb=None):
+        self.pg = fpage
+        self.setcb = setcb
+
+    def attach(self, reader):
+        super(pagefetch, self).attach(reader)
+        self.lbl.set_text("Fetching page...")
         self.pg.notify(self.haspage)
 
     def haspage(self):
@@ -292,31 +310,15 @@ class pagefetch(object):
                 self.setcb(self.pg.val)
         self.rd.pagefetch.set(None)
 
-    def abort(self):
-        self.rd.sbar.remove(self.msg)
-
-class imgfetch(object):
+class imgfetch(msgproc):
     def __init__(self, fimage):
         self.img = fimage
         self.upd = False
         self.error = None
 
     def attach(self, reader):
-        self.rd = reader
-        self.msg = gtk.Alignment(0, 0.5, 0, 0)
-        self.hlay = gtk.HBox()
-        self.lbl = gtk.Label("Fetching image...")
-        self.hlay.pack_start(self.lbl)
-        self.lbl.show()
-        self.prog = gtk.ProgressBar()
-        self.prog.set_fraction(0.0)
-        self.hlay.pack_start(self.prog, padding=5)
-        self.prog.show()
-        self.msg.add(self.hlay)
-        self.hlay.show()
-        self.rd.sbar.pack_start(self.msg)
-        self.msg.show()
-
+        super(imgfetch, self).attach(reader)
+        self.lbl.set_text("Fetching image...")
         self.img.notify(self.imgprog)
 
     def imgprog(self):
@@ -331,8 +333,7 @@ class imgfetch(object):
                 self.upd = True
             self.rd.imgfetch.set(None)
         else:
-            p = self.img.prog
-            if p: self.prog.set_fraction(p)
+            self.prog(self.img.prog)
             return True
 
     def abort(self):
@@ -342,22 +343,13 @@ class imgfetch(object):
             if self.error is not None:
                 self.rd.pagelbl.set_text("Error fetching image: " + self.error)
 
-class preload(object):
+class preload(msgproc):
     def __init__(self, fpage):
         self.pg = fpage
 
     def attach(self, reader):
-        self.rd = reader
-        self.msg = gtk.Alignment(0, 0.5, 0, 0)
-        self.hlay = gtk.HBox()
-        self.lbl = gtk.Label("Fetching next page...")
-        self.hlay.pack_start(self.lbl)
-        self.lbl.show()
-        self.msg.add(self.hlay)
-        self.hlay.show()
-        self.rd.sbar.pack_start(self.msg)
-        self.msg.show()
-
+        super(preload, self).attach(reader)
+        self.lbl.set_text("Fetching next page...")
         self.pg.notify(self.haspage)
 
     def haspage(self):
@@ -365,10 +357,6 @@ class preload(object):
         if not self.pg.done: return True
         if self.pg.val is not None:
             self.img = self.rd.cache[self.pg.val]
-            self.prog = gtk.ProgressBar()
-            self.prog.set_fraction(0.0)
-            self.hlay.pack_start(self.prog, padding=5)
-            self.prog.show()
             self.lbl.set_text("Loading next page...")
             self.img.notify(self.imgprog)
         else:
@@ -379,8 +367,7 @@ class preload(object):
         if self.img.done:
             self.rd.preload.set(None)
         else:
-            p = self.img.prog
-            if p: self.prog.set_fraction(p)
+            self.prog(self.img.prog)
             return True
 
     def abort(self):
