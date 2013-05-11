@@ -36,7 +36,11 @@ class pagetree(object):
     `id', which should be a string that can be passed to the `byid'
     function of its parent node to recover the node. Such string ID
     should be more persistent than the node's numeric index in the
-    parent."""
+    parent.
+
+    All pagetree objects should contain an attribute `name',
+    containing some human-readable Unicode representation of the
+    pagelist."""
     
     def idlist(self):
         """Returns a list of the IDs necessary to resolve this node
@@ -52,10 +56,7 @@ class pagetree(object):
 
 class pagelist(pagetree):
     """Class representing a list of either pages, or nested
-    pagelists. Might be, for instance, a volume or a chapter.
-
-    All pagelists should contain an attribute `name', containing some
-    human-readable Unicode representation of the pagelist."""
+    pagelists. Might be, for instance, a volume or a chapter."""
 
     def __len__(self):
         """Return the number of (direct) sub-nodes in this pagelist.

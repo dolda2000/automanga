@@ -29,6 +29,7 @@ class page(lib.page):
         self.manga = self.volume.manga
         self.n = n
         self.id = str(n)
+        self.name = u"Page %s" % n
         self.url = url
         self.ciurl = None
 
@@ -40,6 +41,12 @@ class page(lib.page):
 
     def open(self):
         return imgstream(self.iurl())
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return "<mangafox.page %r.%r.%r.%r>" % (self.manga.name, self.volume.name, self.chapter.name, self.name)
 
 class chapter(lib.pagelist):
     def __init__(self, volume, stack, id, name, url):
