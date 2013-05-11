@@ -162,7 +162,7 @@ class cursor(object):
         raise StopIteration()
 
     def prev(self):
-        for n, i in reversed(self.cur,stack):
+        for n, i in reversed(self.cur.stack):
             if i > 0:
                 self.cur = self.descend(n[i - 1])
                 return self.cur
