@@ -46,8 +46,8 @@ class pagetree(object):
         """Returns a list of the IDs necessary to resolve this node
         from the root node."""
         if len(self.stack) == 0:
-            raise Exception("Cannot get ID list on root node.")
-        return [n.id for n, i in self.stack[1:]] + [self.id]
+            return []
+        return self.stack[-1][0].idlist() + [self.id]
 
     def byidlist(self, idlist):
         if len(idlist) == 0:
