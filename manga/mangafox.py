@@ -127,7 +127,7 @@ class manga(lib.manga):
         if self.cvol is None:
             page = soup(htcache.fetch(self.url))
             vls = page.find("div", id="chapters").findAll("div", attrs={"class": "slide"})
-            self.cvol = []
+            cvol = []
             for i, vn in enumerate(reversed(vls)):
                 name = vn.find("h3", attrs={"class": "volume"}).contents[0].strip()
                 vid = name.encode("utf8")
@@ -149,7 +149,8 @@ class manga(lib.manga):
                     if url[-7:] != "/1.html":
                         raise Exception("parse error: unexpected chapter URL for %r: %s" % (self, url))
                     vol.ch.append(chapter(vol, vol.stack + [(vol, o)], chid, name, url[:-6]))
-                self.cvol.append(vol)
+                cvol.append(vol)
+            self.cvol = cvol
         return self.cvol
 
     def __str__(self):
