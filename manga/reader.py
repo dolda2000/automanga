@@ -170,13 +170,36 @@ class pageview(gtk.Widget):
         self.set_off((ox, oy))
 gobject.type_register(pageview)
 
-class mangaview(gtk.VBox):
+class reader(gtk.Window):
     def __init__(self, manga):
-        super(mangaview, self).__init__()
-        self.manga  = manga
+        super(reader, self).__init__(gtk.WINDOW_TOPLEVEL)
+        self.connect("delete_event",    lambda wdg, ev, data=None: False)
+        self.connect("destroy",         lambda wdg, data=None:     self.quit())
+        self.connect("key_press_event", self.key)
+        self.pfr = gtk.Frame(None)
+        self.pfr.set_shadow_type(gtk.SHADOW_NONE)
+        self.add(self.pfr)
+        self.pfr.show()
+
+        self.manga = manga
         self.page = None
         self.cursor = lib.cursor(manga)
         self.setpage(self.cursor.cur)
+        self.updtitle()
+
+    def setpage(self, page):
+        if self.page is not None:
+            self.pfr.remove(self.page)
+            self.page = None
+        if page is not None:
+            with self.cursor.cur.open() as inp:
+                pb = gtk.gdk.pixbuf_new_from_stream(gio.memory_input_stream_new_from_data(inp.read()))
+            self.page = pageview(pb)
+            self.pfr.add(self.page)
+            self.page.show()
+
+    def updtitle(self):
+        self.set_title(u"Automanga \u2013 " + self.manga.name)
 
     @property
     def zoom(self):
@@ -190,63 +213,38 @@ class mangaview(gtk.VBox):
         px, py = off
         self.page.set_off((ox + px, oy + py))
 
-    def setpage(self, page):
-        if self.page is not None:
-            self.remove(self.page)
-            self.page = None
-        if page is not None:
-            with self.cursor.cur.open() as inp:
-                pb = gtk.gdk.pixbuf_new_from_stream(gio.memory_input_stream_new_from_data(inp.read()))
-            self.page = pageview(pb)
-            self.pack_start(self.page)
-            self.page.show()
-
-class reader(gtk.Window):
-    def __init__(self):
-        super(reader, self).__init__(gtk.WINDOW_TOPLEVEL)
-        self.connect("delete_event",    lambda wdg, ev, data=None: False)
-        self.connect("destroy",         lambda wdg, data=None:     self.quit())
-        self.connect("key_press_event", self.key)
-        self.mview = None
-
-    def updtitle(self):
-        self.set_title("Automanga")
-
-    def setmanga(self, manga):
-        if self.mview is not None:
-            self.remove(self.mview)
-            self.mview = None
-        if manga is not None:
-            self.mview = mangaview(manga)
-            self.add(self.mview)
-            self.mview.show()
-        self.updtitle()
-
     def key(self, wdg, ev, data=None):
         if ev.keyval in [ord('Q'), ord('q'), 65307]:
             self.quit()
-        if self.mview:
-            mv = self.mview
-            if ev.keyval in [ord('O'), ord('o')]:
-                mv.zoom = 1.0
-            elif ev.keyval in [ord('P'), ord('p')]:
-                mv.zoom = None
-            elif ev.keyval in [ord('[')]:
-                mv.zoom = min(mv.zoom * 1.25, 3)
-            elif ev.keyval in [ord(']')]:
-                mv.zoom /= 1.25
-            elif ev.keyval in [ord('H'), ord('h')]:
-                mv.pan((-100, 0))
-            elif ev.keyval in [ord('J'), ord('j')]:
-                mv.pan((0, 100))
-            elif ev.keyval in [ord('K'), ord('k')]:
-                mv.pan((0, -100))
-            elif ev.keyval in [ord('L'), ord('l')]:
-                mv.pan((100, 0))
-            elif ev.keyval in [ord(' ')]:
-                mv.setpage(mv.cursor.next())
-            elif ev.keyval in [65288]:
-                mv.setpage(mv.cursor.prev())
+        if ev.keyval in [ord('O'), ord('o')]:
+            self.zoom = 1.0
+        elif ev.keyval in [ord('P'), ord('p')]:
+            self.zoom = None
+        elif ev.keyval in [ord('[')]:
+            self.zoom = min(self.zoom * 1.25, 3)
+        elif ev.keyval in [ord(']')]:
+            self.zoom /= 1.25
+        elif ev.keyval in [ord('h')]:
+            self.pan((-100, 0))
+        elif ev.keyval in [ord('j')]:
+            self.pan((0, 100))
+        elif ev.keyval in [ord('k')]:
+            self.pan((0, -100))
+        elif ev.keyval in [ord('l')]:
+            self.pan((100, 0))
+        elif ev.keyval in [ord('H')]:
+            self.page.set_off((0, self.page.off[1]))
+        elif ev.keyval in [ord('J')]:
+            self.page.set_off((self.page.off[0], self.page.get_asize()[1]))
+        elif ev.keyval in [ord('K')]:
+            self.page.set_off((self.page.off[1], 0))
+        elif ev.keyval in [ord('L')]:
+            self.page.set_off((self.page.get_asize()[0], self.page.off[1]))
+        elif ev.keyval in [ord(' ')]:
+            self.setpage(self.cursor.next())
+        elif ev.keyval in [65288]:
+            self.setpage(self.cursor.prev())
 
     def quit(self):
         self.hide()
+gobject.type_register(reader)
