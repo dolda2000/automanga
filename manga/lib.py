@@ -148,9 +148,9 @@ class cursor(object):
         else:
             self.cur = self.descend(ob)
 
-    def descend(self, ob):
+    def descend(self, ob, last=False):
         while isinstance(ob, pagelist):
-            ob = ob[0]
+            ob = ob[len(ob) - 1 if last else 0]
         if not isinstance(ob, page):
             raise TypeError("object in page tree was unexpectedly not a pagetree")
         return ob
@@ -165,7 +165,7 @@ class cursor(object):
     def prev(self):
         for n, i in reversed(self.cur.stack):
             if i > 0:
-                self.cur = self.descend(n[i - 1])
+                self.cur = self.descend(n[i - 1], True)
                 return self.cur
         raise StopIteration()
 
