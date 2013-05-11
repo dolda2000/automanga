@@ -12,6 +12,7 @@ class future(threading.Thread):
         self._exc = None
         self._notlist = []
         self._started = False
+        self.setDaemon(True)
 
     def start(self):
         if not self._started:
@@ -263,8 +264,9 @@ class pageview(gtk.Widget):
 gobject.type_register(pageview)
 
 class pagefetch(object):
-    def __init__(self, fpage):
+    def __init__(self, fpage, setcb=None):
         self.pg = fpage
+        self.setcb = setcb
 
     def attach(self, reader):
         self.rd = reader
@@ -286,6 +288,8 @@ class pagefetch(object):
             return True
         if self.pg.val is not None:
             self.rd.setpage(self.pg.val)
+            if self.setcb is not None:
+                self.setcb(self.pg.val)
         self.rd.pagefetch.set(None)
 
     def abort(self):
@@ -306,7 +310,7 @@ class imgfetch(object):
         self.lbl.show()
         self.prog = gtk.ProgressBar()
         self.prog.set_fraction(0.0)
-        self.hlay.pack_start(self.prog)
+        self.hlay.pack_start(self.prog, padding=5)
         self.prog.show()
         self.msg.add(self.hlay)
         self.hlay.show()
@@ -338,6 +342,50 @@ class imgfetch(object):
             if self.error is not None:
                 self.rd.pagelbl.set_text("Error fetching image: " + self.error)
 
+class preload(object):
+    def __init__(self, fpage):
+        self.pg = fpage
+
+    def attach(self, reader):
+        self.rd = reader
+        self.msg = gtk.Alignment(0, 0.5, 0, 0)
+        self.hlay = gtk.HBox()
+        self.lbl = gtk.Label("Fetching next page...")
+        self.hlay.pack_start(self.lbl)
+        self.lbl.show()
+        self.msg.add(self.hlay)
+        self.hlay.show()
+        self.rd.sbar.pack_start(self.msg)
+        self.msg.show()
+
+        self.pg.notify(self.haspage)
+
+    def haspage(self):
+        if self.rd.preload.cur != self: return False
+        if not self.pg.done: return True
+        if self.pg.val is not None:
+            self.img = self.rd.cache[self.pg.val]
+            self.prog = gtk.ProgressBar()
+            self.prog.set_fraction(0.0)
+            self.hlay.pack_start(self.prog, padding=5)
+            self.prog.show()
+            self.lbl.set_text("Loading next page...")
+            self.img.notify(self.imgprog)
+        else:
+            self.rd.preload.set(None)
+
+    def imgprog(self):
+        if self.rd.preload.cur != self: return False
+        if self.img.done:
+            self.rd.preload.set(None)
+        else:
+            p = self.img.prog
+            if p: self.prog.set_fraction(p)
+            return True
+
+    def abort(self):
+        self.rd.sbar.remove(self.msg)
+
 class procslot(object):
     __slots__ = ["cur", "p"]
     def __init__(self, p):
@@ -365,6 +413,7 @@ class reader(gtk.Window):
         self.cache = pagecache()
         self.pagefetch = procslot(self)
         self.imgfetch = procslot(self)
+        self.preload = procslot(self)
 
         vlay = gtk.VBox()
         self.pfr = gtk.Frame(None)
@@ -415,9 +464,11 @@ class reader(gtk.Window):
         else:
             self.setimg(None)
 
-    def fetchpage(self, fpage):
+    def fetchpage(self, fpage, setcb=None):
         self.imgfetch.set(None)
-        self.pagefetch.set(pagefetch(fpage))
+        proc = pagefetch(fpage, setcb)
+        self.pagefetch.set(proc)
+        return proc
 
     def updtitle(self):
         self.set_title(u"Automanga \u2013 " + self.manga.name)
@@ -469,9 +520,9 @@ class reader(gtk.Window):
                 self.page.set_off((self.page.get_asize()[0], self.page.off[1]))
         if self.point is not None:
             if ev.keyval in [ord(' ')]:
-                self.fetchpage(self.point.next)
+                self.fetchpage(self.point.next, lambda page: self.preload.set(preload(relpageget(page, False, self.cache))))
             elif ev.keyval in [65288]:
-                self.fetchpage(self.point.prev)
+                self.fetchpage(self.point.prev, lambda page: self.preload.set(preload(relpageget(page, True, self.cache))))
 
     def quit(self):
         self.hide()
