@@ -172,17 +172,16 @@ class cursor(object):
     def __iter__(self):
         return self
 
-def _lazymod(name):
-    return __import__(name, fromlist=["dummy"])
-class _lazydict(object):
-    def __init__(self):
-        self.bk = {}
-    def __setitem__(self, key, val):
-        self.bk[key] = "u", val
-    def __getitem__(self, key):
-        st, v = self.bk[key]
-        if st == "u":
-            v = self.bk[key] = v()
-        return v
-libraries = _lazydict()
-libraries["mf"] = lambda: _lazymod("manga.mangafox").library()
+loaded = {}
+def findlib(name):
+    def load(name):
+        mod = __import__(name, fromlist=["dummy"])
+        if not hasattr(mod, "library"):
+            raise ImportError("module " + name + " is not a manga library")
+        return mod.library()
+    if name not in loaded:
+        try:
+            loaded[name] = load("manga." + name)
+        except ImportError:
+            loaded[name] = load(name)
+    return loaded[name]

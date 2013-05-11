@@ -29,8 +29,8 @@ if search:
         usage(sys.stderr)
         sys.exit(1)
     try:
-        lib = manga.lib.libraries[args[0]]
-    except KeyError:
+        lib = manga.lib.findlib(args[0])
+    except ImportError:
         sys.stderr.write("automanga: no such library: %s\n" % args[0])
         sys.exit(1)
     for manga in lib.byname(args[1]):
@@ -42,8 +42,8 @@ if libname is not None:
         usage(sys.stderr)
         sys.exit(1)
     try:
-        lib = manga.lib.libraries[libname]
-    except KeyError:
+        lib = manga.lib.findlib(libname)
+    except ImportError:
         sys.stderr.write("automanga: no such library: %s\n" % libname)
         sys.exit(1)
     try:
