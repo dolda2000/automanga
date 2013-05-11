@@ -1,0 +1,60 @@
+#!/usr/bin/python
+
+import sys, getopt
+import manga.lib, manga.reader
+import glib, gobject, gtk
+
+gobject.threads_init()
+gtk.gdk.threads_init()
+
+def usage(out):
+    out.write("usage: automanga [-h] [DIR]\n")
+    out.write("       automanga [-h] -l LIBRARY ID\n")
+    out.write("       automanga [-h] -s LIBRARY NAME\n")
+
+libname = None
+search = False
+opts, args = getopt.getopt(sys.argv[1:], "hl:s")
+for o, a in opts:
+    if o == "-h":
+        usage(sys.stdout)
+        sys.exit(0)
+    elif o == "-l":
+        libname = a
+    elif o == "-s":
+        search = True
+
+if search:
+    if len(args) < 2:
+        usage(sys.stderr)
+        sys.exit(1)
+    try:
+        lib = manga.lib.libraries[args[0]]
+    except KeyError:
+        sys.stderr.write("automanga: no such library: %s\n" % args[0])
+        sys.exit(1)
+    for manga in lib.byname(args[1]):
+        sys.stdout.write("\"%s\": %s\n" % (manga.name, manga.id))
+    sys.exit(0)
+
+if libname is not None:
+    if len(args) < 1:
+        usage(sys.stderr)
+        sys.exit(1)
+    try:
+        lib = manga.lib.libraries[libname]
+    except KeyError:
+        sys.stderr.write("automanga: no such library: %s\n" % libname)
+        sys.exit(1)
+    try:
+        mng = lib.byid(args[0])
+    except KeyError:
+        sys.stderr.write("automanga: no such manga: %s\n" % args[0])
+        sys.exit(1)
+else:
+    sys.stderr.write("automanga: local manga not yet implemented\n")
+    sys.exit(1)
+
+reader = manga.reader.reader(mng)
+reader.show()
+gtk.main()
