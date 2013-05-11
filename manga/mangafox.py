@@ -7,6 +7,7 @@ class imgstream(lib.imgstream):
     def __init__(self, url):
         self.bk = urllib.urlopen(url)
         self.ctype = self.bk.info()["Content-Type"]
+        self.clen = int(self.bk.info()["Content-Length"])
 
     def fileno(self):
         return self.bk.fileno()

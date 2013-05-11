@@ -115,7 +115,9 @@ class imgstream(object):
     when exiting the with-scope.
 
     All imgstreams should contain an attribute `ctype', being the
-    Content-Type of the image being read by the stream."""
+    Content-Type of the image being read by the stream, and `clen`,
+    being either an int describing the total number of bytes in the
+    stream, or None if the value is not known in advance."""
 
     def __enter__(self):
         return self
