@@ -23,23 +23,18 @@ class future(threading.Thread):
         try:
             val = self.value()
         except Exception as e:
-            with gtk.gdk.lock:
-                try:
-                    self._exc = e
-                    for cb in self._notlist:
-                        cb()
-                    self._notlist = []
-                finally:
-                    gtk.gdk.flush()
+            self._exc = e
+            gobject.idle_add(self._callcbs, True)
         else:
-            with gtk.gdk.lock:
-                try:
-                    self._val = [val]
-                    for cb in self._notlist:
-                        cb()
-                    self._notlist = []
-                finally:
-                    gtk.gdk.flush()
+            self._val = [val]
+            gobject.idle_add(self._callcbs, True)
+
+    def _callcbs(self, final):
+        nls = []
+        for cb in self._notlist:
+            if cb():
+                nls.append(cb)
+        self._notlist = [] if final else nls
 
     # Caller must hold GDK lock
     def notify(self, cb):
@@ -50,15 +45,7 @@ class future(threading.Thread):
             cb()
 
     def progcb(self):
-        with gtk.gdk.lock:
-            try:
-                nls = []
-                for cb in self._notlist:
-                    if cb():
-                        nls.append(cb)
-                self._notlist = nls
-            finally:
-                gtk.gdk.flush()
+        gobject.idle_add(self._callcbs, False)
 
     @property
     def val(self):
@@ -100,7 +87,11 @@ class imgload(future):
                 buf.extend(read)
                 self.progcb()
         self.st = None
-        return gtk.gdk.pixbuf_new_from_stream(gio.memory_input_stream_new_from_data(str(buf)))
+        with gtk.gdk.lock:
+            try:
+                return gtk.gdk.pixbuf_new_from_stream(gio.memory_input_stream_new_from_data(str(buf)))
+            finally:
+                gtk.gdk.flush()
 
     @property
     def prog(self):
