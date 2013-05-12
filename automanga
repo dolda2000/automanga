@@ -69,7 +69,7 @@ if alias and (alias.find('=') > 0):
     except KeyError:
         sys.stderr.write("automanga: no such manga: %s\n" % mid)
         sys.exit(1)
-    profile.setalias(alias, libname, mid)
+    profile.setalias(alias, libname, mng.id)
     sys.exit(0)
 
 if alias:
