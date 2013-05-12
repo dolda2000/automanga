@@ -151,9 +151,15 @@ class manga(lib.manga):
                         oids.append(cur)
                 ret = []
                 for id in oids:
-                    cur = interm(id, id, p.stack + [(p, len(ret))], [])
-                    cur.direct = constree(cur, [(nm, st) for nm, st in structs if st[var[idx]] == id], idx + 1)
-                    ret.append(cur)
+                    sub = [(nm, st) for nm, st in structs if st[var[idx]] == id]
+                    if len(sub) == 1:
+                        nm, st = sub[0]
+                        id = "".join(st[var[idx]:])
+                        ret.append(page(self, pj(self.path, orig[nm]), id, id, p.stack + [(p, len(ret))]))
+                    else:
+                        cur = interm(id, id, p.stack + [(p, len(ret))], [])
+                        cur.direct = constree(cur, sub, idx + 1)
+                        ret.append(cur)
                 return ret
         return constree(self, structs, 0)
 
