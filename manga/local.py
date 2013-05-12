@@ -128,6 +128,8 @@ class manga(lib.manga):
         ordered, files = self.imglist()
         pages, orig = self.bakenames(files)
         mx = maxstruct(pages)
+        if mx is None:
+            raise TypeError("could not figure out any structure")
         var = [i for i, part in enumerate(mx) if part == int]
         structs = [(nm, decode1(nm)) for nm in pages]
         if not ordered:
