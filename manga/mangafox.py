@@ -6,8 +6,16 @@ soup = BeautifulSoup.BeautifulSoup
 class imgstream(lib.imgstream):
     def __init__(self, url):
         self.bk = urllib.urlopen(url)
-        self.ctype = self.bk.info()["Content-Type"]
-        self.clen = int(self.bk.info()["Content-Length"])
+        ok = False
+        try:
+            if self.bk.getcode() != 200:
+                raise IOError("Server error: " + str(self.bk.getcode()))
+            self.ctype = self.bk.info()["Content-Type"]
+            self.clen = int(self.bk.info()["Content-Length"])
+            ok = True
+        finally:
+            if not ok:
+                self.bk.close()
 
     def fileno(self):
         return self.bk.fileno()
