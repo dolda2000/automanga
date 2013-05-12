@@ -8,19 +8,23 @@ gobject.threads_init()
 gtk.gdk.threads_init()
 
 def usage(out):
-    out.write("usage: automanga [-h] [-p PROFILE] [-l LIBRARY] [DIR-OR-ID]\n")
-    out.write("       automanga [-h] -s LIBRARY NAME\n")
+    out.write("usage: automanga [-h] [-p PROFILE] {DIRECTORY|-l LIBRARY ID|-a ALIAS}\n")
+    out.write("       automanga -a ALIAS=LIBRARY:ID\n")
+    out.write("       automanga -s LIBRARY NAME\n")
 
 libname = None
 search = False
 profile = ""
-opts, args = getopt.getopt(sys.argv[1:], "hl:sp:")
+alias = None
+opts, args = getopt.getopt(sys.argv[1:], "hl:sp:a:")
 for o, a in opts:
     if o == "-h":
         usage(sys.stdout)
         sys.exit(0)
     elif o == "-l":
         libname = a
+    elif o == "-a":
+        alias = a
     elif o == "-s":
         search = True
     elif o == "-p":
@@ -49,7 +53,42 @@ if search:
         sys.stdout.write("\"%s\": %s\n" % (manga.name, manga.id))
     sys.exit(0)
 
-if libname is not None:
+if alias and (alias.find('=') > 0):
+    alias, nm = alias.split('=', 1)
+    if not ':' in nm:
+        usage(sys.stderr)
+        sys.exit(1)
+    libname, mid = nm.split(':', 1)
+    try:
+        lib = manga.lib.findlib(libname)
+    except ImportError:
+        sys.stderr.write("automanga: no such library: %s\n" % libname)
+        sys.exit(1)
+    try:
+        mng = lib.byid(mid)
+    except KeyError:
+        sys.stderr.write("automanga: no such manga: %s\n" % mid)
+        sys.exit(1)
+    profile.setalias(alias, libname, mid)
+    sys.exit(0)
+
+if alias:
+    try:
+        libname, mid = profile.getalias(alias)
+    except KeyError:
+        sys.stderr("automanga: no such alias: %s\n" % alias)
+        sys.exit(1)
+    try:
+        lib = manga.lib.findlib(libname)
+    except ImportError:
+        sys.stderr.write("automanga: no such library: %s\n" % libname)
+        sys.exit(1)
+    try:
+        mng = lib.byid(mid)
+    except KeyError:
+        sys.stderr.write("automanga: manga no longer found: %s\n" % mid)
+        sys.exit(1)
+elif libname is not None:
     if len(args) < 1:
         usage(sys.stderr)
         sys.exit(1)

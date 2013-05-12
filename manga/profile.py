@@ -182,6 +182,30 @@ class profile(object):
         with openwdir(pj(basedir, "last"), "w") as f:
             f.write(self.name + "\n")
 
+    def getaliases(self):
+        ret = {}
+        if os.path.exists(pj(self.dir, "alias")):
+            with openwdir(pj(self.dir, "alias")) as f:
+                for ln in f:
+                    ln = splitline(ln)
+                    if len(ln) < 1: continue
+                    if ln[0] == "alias" and len(ln) > 3:
+                        ret[ln[1]] = ln[2], ln[3]
+        return ret
+
+    def savealiases(self, map):
+        with openwdir(pj(self.dir, "alias"), "w") as f:
+            for nm, (libnm, id) in map.iteritems():
+                f.write(consline("alias", nm, libnm, id) + "\n")
+
+    def getalias(self, nm):
+        return self.getaliases()[nm]
+
+    def setalias(self, nm, libnm, id):
+        aliases = self.getaliases()
+        aliases[nm] = libnm, id
+        self.savealiases(aliases)
+
     @classmethod
     def byname(cls, name):
         if not name or name == "last" or name[0] == '.':
