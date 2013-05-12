@@ -10,17 +10,20 @@ class cache(object):
         n.update(url)
         return n.hexdigest()
 
+    def miss(self, url):
+        s = urllib.urlopen(url)
+        try:
+            return s.read()
+        finally:
+            s.close()
+
     def fetch(self, url, expire = 3600):
         path = pj(self.dir, self.mangle(url))
         if os.path.exists(path):
             if time.time() - os.stat(path).st_mtime < expire:
                 with open(path) as f:
                     return f.read()
-        s = urllib.urlopen(url)
-        try:
-            data = s.read()
-        finally:
-            s.close()
+        data = self.miss(url)
         if not os.path.isdir(self.dir):
             os.makedirs(self.dir)
         with open(path, "w") as f:
