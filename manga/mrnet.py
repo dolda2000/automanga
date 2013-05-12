@@ -117,7 +117,7 @@ class manga(lib.manga):
                 cid = name.encode("utf8")
                 if isinstance(cla.nextSibling, unicode):
                     ncont = unicode(cla.nextSibling)
-                    if ncont[:3] == u" : ":
+                    if len(ncont) > 3 and ncont[:3] == u" : ":
                         name += u": " + ncont[3:]
                 cch.append(chapter(self, [(self, len(cch))], cid, name, url))
             self.cch = cch
@@ -140,3 +140,27 @@ class library(lib.library):
             raise KeyError(id)
         name = page.find("h2", attrs={"class": "aname"}).string
         return manga(self, id, name, url)
+
+    def __iter__(self):
+        page = soup(htcache.fetch(self.base + "alphabetical"))
+        for sec in page.findAll("div", attrs={"class": "series_alpha"}):
+            for li in sec.find("ul", attrs={"class": "series_alpha"}).findAll("li"):
+                url = li.a["href"].encode("us-ascii")
+                name = li.a.string
+                if url[:1] != "/": continue
+                id = url[1:]
+                if '/' in id:
+                    # Does this distinction mean something?
+                    id = id[id.rindex('/') + 1:]
+                    if id[-5:] != ".html":
+                        continue
+                    id = id[:-5]
+                yield manga(self, id, name, urlparse.urljoin(self.base, url))
+
+    def byname(self, prefix):
+        if not isinstance(prefix, unicode):
+            prefix = prefix.decode("utf8")
+        prefix = prefix.lower()
+        for manga in self:
+            if manga.name.lower()[:len(prefix)] == prefix:
+                yield manga
