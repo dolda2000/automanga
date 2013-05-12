@@ -65,10 +65,15 @@ if libname is not None:
         sys.exit(1)
 else:
     libname = "local"
-    if len(args) > 0:
-        mng = manga.local.manga(args[0])
-    else:
-        mng = manga.local.manga(".")
+    try:
+        if len(args) > 0:
+            mdir = args[0]
+        else:
+            mdir = "."
+        mng = manga.local.manga(mdir)
+    except TypeError:
+        sys.stderr.write("automanga: not a valid manga directory: %s\n" % mdir)
+        sys.exit(1)
 
 mprof = None if profile is None else profile.getmanga(libname, mng.id, True)
 if profile is not None:
