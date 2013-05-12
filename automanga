@@ -1,20 +1,20 @@
 #!/usr/bin/python
 
 import sys, getopt
-import manga.lib, manga.reader, manga.local
+import manga.lib, manga.reader, manga.profile, manga.local
 import glib, gobject, gtk
 
 gobject.threads_init()
 gtk.gdk.threads_init()
 
 def usage(out):
-    out.write("usage: automanga [-h] [DIR]\n")
-    out.write("       automanga [-h] -l LIBRARY ID\n")
+    out.write("usage: automanga [-h] [-p PROFILE] [-l LIBRARY] [DIR-OR-ID]\n")
     out.write("       automanga [-h] -s LIBRARY NAME\n")
 
 libname = None
 search = False
-opts, args = getopt.getopt(sys.argv[1:], "hl:s")
+profile = ""
+opts, args = getopt.getopt(sys.argv[1:], "hl:sp:")
 for o, a in opts:
     if o == "-h":
         usage(sys.stdout)
@@ -23,6 +23,18 @@ for o, a in opts:
         libname = a
     elif o == "-s":
         search = True
+    elif o == "-p":
+        if a == "":
+            profile = None
+        else:
+            profile = a
+if profile == "":
+    try:
+        profile = manga.profile.profile.last()
+    except KeyError:
+        profile = manga.profile.profile.byname("default")
+elif profile is not None:
+    profile = manga.profile.profile.byname(profile)
 
 if search:
     if len(args) < 2:
@@ -52,11 +64,15 @@ if libname is not None:
         sys.stderr.write("automanga: no such manga: %s\n" % args[0])
         sys.exit(1)
 else:
+    libname = "local"
     if len(args) > 0:
         mng = manga.local.manga(args[0])
     else:
         mng = manga.local.manga(".")
 
-reader = manga.reader.reader(mng)
+if profile is not None:
+    profile.setlast()
+
+reader = manga.reader.reader(mng, profile.getmanga(libname, mng.id, True))
 reader.show()
 gtk.main()

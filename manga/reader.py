@@ -136,6 +136,15 @@ class relpageget(future):
                 self.cache[page]
         return page
 
+class idpageget(future):
+    def __init__(self, base, idlist):
+        super(idpageget, self).__init__()
+        self.bnode = base
+        self.idlist = idlist
+
+    def value(self):
+        return lib.cursor(self.bnode.byidlist(self.idlist)).cur
+
 class pageget(future):
     def __init__(self, fnode):
         super(pageget, self).__init__()
@@ -446,7 +455,7 @@ class sbox(gtk.ComboBox):
         self.rd.fetchpage(pageget(self.pnode[self.get_active()]))
 
 class reader(gtk.Window):
-    def __init__(self, manga):
+    def __init__(self, manga, profile=None):
         super(reader, self).__init__(gtk.WINDOW_TOPLEVEL)
         self.connect("delete_event",    lambda wdg, ev, data=None: False)
         self.connect("destroy",         lambda wdg, data=None:     self.quit())
@@ -455,6 +464,7 @@ class reader(gtk.Window):
         self.pagefetch = procslot(self)
         self.imgfetch = procslot(self)
         self.preload = procslot(self)
+        self.profile = profile
 
         self.manga = manga
         self.page = None
@@ -487,7 +497,10 @@ class reader(gtk.Window):
         self.add(vlay)
         vlay.show()
 
-        self.fetchpage(pageget(self.manga))
+        if self.profile and "curpage" in self.profile:
+            self.fetchpage(idpageget(self.manga, self.profile["curpage"]))
+        else:
+            self.fetchpage(pageget(self.manga))
         self.updtitle()
 
     def updpagelbl(self):
@@ -527,6 +540,9 @@ class reader(gtk.Window):
         if self.point is not None:
             self.point = None
         if page is not None:
+            if self.profile:
+                self.profile.setprop("curpage", page.idlist())
+                self.profile.saveprops()
             self.point = ccursor(page, self.cache)
             self.imgfetch.set(imgfetch(self.cache[page]))
         else:

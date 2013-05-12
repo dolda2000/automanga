@@ -49,6 +49,7 @@ def splitline(line):
                 elif c.isspace():
                     ret.append(buf)
                     buf = ""
+                    a = False
                     break
                 elif c == "\\" and p < len(line):
                     buf += bsq(line[p])
@@ -103,6 +104,12 @@ class manga(object):
                 raise KeyError(key)
             return default
         return self.props[key]
+
+    def __getitem__(self, key):
+        return self.props[key]
+
+    def __contains__(self, key):
+        return key in self.props
 
     def setprop(self, key, val):
         self.props[key] = val
