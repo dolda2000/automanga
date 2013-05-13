@@ -115,6 +115,14 @@ class pagecache(object):
             self.bk = self.bk[-self.sz:]
         return f
 
+    def __delitem__(self, page):
+        idl = page.idlist()
+        for i, (ol, f) in enumerate(self.bk):
+            if ol == idl:
+                del self.bk[i]
+                return
+        raise KeyError(idl)
+
 class relpageget(future):
     def __init__(self, cur, prev, cache=None):
         super(relpageget, self).__init__()
@@ -608,6 +616,10 @@ class reader(gtk.Window):
                 self.fetchpage(self.point.next, lambda page: self.preload.set(preload(relpageget(page, False, self.cache))))
             elif ev.keyval in [65288]:
                 self.fetchpage(self.point.prev, lambda page: self.preload.set(preload(relpageget(page, True, self.cache))))
+            elif ev.keyval in [ord('R'), ord('r')]:
+                page = self.point.cur.cur
+                del self.cache[page]
+                self.imgfetch.set(imgfetch(self.cache[page]))
 
     def quit(self):
         self.hide()
