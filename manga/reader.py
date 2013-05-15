@@ -1,4 +1,4 @@
-import threading, gtk, gio, gobject
+import threading, gtk, gobject
 import lib, profile
 
 class notdone(Exception): pass
@@ -75,7 +75,7 @@ class imgload(future):
         self.start()
 
     def value(self):
-        buf = bytearray()
+        buf = gtk.gdk.PixbufLoader()
         with self.page.open() as st:
             self.p = 0
             self.st = st
@@ -84,14 +84,11 @@ class imgload(future):
                 if read == "":
                     break
                 self.p += len(read)
-                buf.extend(read)
+                buf.write(read)
                 self.progcb()
         self.st = None
-        with gtk.gdk.lock:
-            try:
-                return gtk.gdk.pixbuf_new_from_stream(gio.memory_input_stream_new_from_data(str(buf)))
-            finally:
-                gtk.gdk.flush()
+        buf.close()
+        return buf.get_pixbuf()
 
     @property
     def prog(self):
