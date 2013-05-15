@@ -1,5 +1,5 @@
 import threading, gtk, gio, gobject
-import lib
+import lib, profile
 
 class notdone(Exception): pass
 
@@ -463,7 +463,7 @@ class sbox(gtk.ComboBox):
         self.rd.fetchpage(pageget(self.pnode[self.get_active()]))
 
 class reader(gtk.Window):
-    def __init__(self, manga, profile=None):
+    def __init__(self, manga, prof=None):
         super(reader, self).__init__(gtk.WINDOW_TOPLEVEL)
         self.connect("delete_event",    lambda wdg, ev, data=None: False)
         self.connect("destroy",         lambda wdg, data=None:     self.quit())
@@ -472,7 +472,7 @@ class reader(gtk.Window):
         self.pagefetch = procslot(self)
         self.imgfetch = procslot(self)
         self.preload = procslot(self)
-        self.profile = profile
+        self.profile = prof if prof else profile.memmanga(None, None, manga.id)
 
         self.manga = manga
         self.page = None
@@ -505,8 +505,8 @@ class reader(gtk.Window):
         self.add(vlay)
         vlay.show()
 
-        if self.profile and "curpage" in self.profile:
-            self.fetchpage(idpageget(self.manga, self.profile["curpage"]))
+        if "curpage" in self.profile.props:
+            self.fetchpage(idpageget(self.manga, self.profile.props["curpage"]))
         else:
             self.fetchpage(pageget(self.manga))
         self.updtitle()
@@ -548,9 +548,8 @@ class reader(gtk.Window):
         if self.point is not None:
             self.point = None
         if page is not None:
-            if self.profile:
-                self.profile.setprop("curpage", page.idlist())
-                self.profile.saveprops()
+            self.profile.props["curpage"] = page.idlist()
+            self.profile.save()
             self.point = ccursor(page, self.cache)
             self.imgfetch.set(imgfetch(self.cache[page]))
         else:

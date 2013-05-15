@@ -79,12 +79,27 @@ def consline(*words):
     return buf
 
 class manga(object):
-    def __init__(self, profile, libnm, id, path):
+    def __init__(self, profile, libnm, id):
         self.profile = profile
         self.libnm = libnm
         self.id = id
-        self.path = path
         self.props = self.loadprops()
+
+    def open(self):
+        import lib
+        return lib.findlib(self.libnm).byid(self.id)
+
+class memmanga(manga):
+    def __init__(self, profile, libnm, id):
+        super(memmanga, self).__init__(profile, libnm, id)
+
+    def loadprops(self):
+        return {}
+
+class filemanga(manga):
+    def __init__(self, profile, libnm, id, path):
+        self.path = path
+        super(filemanga, self).__init__(profile, libnm, id)
 
     def loadprops(self):
         ret = {}
@@ -98,33 +113,13 @@ class manga(object):
                     ret[words[1]] = words[2:]
         return ret
 
-    def prop(self, key, default=KeyError):
-        if key not in self.props:
-            if default is KeyError:
-                raise KeyError(key)
-            return default
-        return self.props[key]
-
-    def __getitem__(self, key):
-        return self.props[key]
-
-    def __contains__(self, key):
-        return key in self.props
-
-    def setprop(self, key, val):
-        self.props[key] = val
-
-    def saveprops(self):
+    def save(self):
         with openwdir(self.path, "w") as f:
             for key, val in self.props.iteritems():
                 if isinstance(val, str):
                     f.write(consline("set", key, val) + "\n")
                 else:
                     f.write(consline("lset", key, *val) + "\n")
-
-    def open(self):
-        import lib
-        return lib.findlib(self.libnm).byid(self.id)
 
 class profile(object):
     def __init__(self, dir):
@@ -161,7 +156,7 @@ class profile(object):
     def getmanga(self, libnm, id, creat=False):
         seq, m = self.getmapping()
         if (libnm, id) in m:
-            return manga(self, libnm, id, pj(self.dir, "%i.manga" % m[(libnm, id)]))
+            return filemanga(self, libnm, id, pj(self.dir, "%i.manga" % m[(libnm, id)]))
         if not creat:
             raise KeyError("no such manga: (%s, %s)" % (libnm, id))
         while True:
@@ -174,7 +169,7 @@ class profile(object):
         fp.close()
         m[(libnm, id)] = seq
         self.savemapping(seq, m)
-        return manga(self, libnm, id, pj(self.dir, "%i.manga" % seq))
+        return filemanga(self, libnm, id, pj(self.dir, "%i.manga" % seq))
 
     def setlast(self):
         if self.name is None:
