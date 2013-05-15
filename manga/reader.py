@@ -462,6 +462,22 @@ class sbox(gtk.ComboBox):
     def changed_cb(self, wdg, data=None):
         self.rd.fetchpage(pageget(self.pnode[self.get_active()]))
 
+class profprop(object):
+    def __init__(self, key, default=None):
+        self.key = key
+        self.default = default
+
+    def __get__(self, ins, cls):
+        return ins.profile.props.get(self.key, self.default)
+
+    def __set__(self, ins, val):
+        ins.profile.props[self.key] = val
+        ins.profile.save()
+
+    def __delete__(self, ins):
+        del ins.profile.props[self.key]
+        ins.profile.save()
+
 class reader(gtk.Window):
     def __init__(self, manga, prof=None):
         super(reader, self).__init__(gtk.WINDOW_TOPLEVEL)
@@ -505,11 +521,14 @@ class reader(gtk.Window):
         self.add(vlay)
         vlay.show()
 
-        if "curpage" in self.profile.props:
-            self.fetchpage(idpageget(self.manga, self.profile.props["curpage"]))
+        if self.curpage is not None:
+            self.fetchpage(idpageget(self.manga, self.curpage))
         else:
             self.fetchpage(pageget(self.manga))
         self.updtitle()
+
+    zmode = profprop("zmode", "fit")
+    curpage = profprop("curpage")
 
     def updpagelbl(self):
         if self.page is None:
@@ -540,6 +559,9 @@ class reader(gtk.Window):
             self.page = None
         if img is not None:
             self.page = pageview(img)
+            if self.zmode == "1":
+                self.page.set_zoom(1)
+                self.page.set_off((0, 0))
             self.pfr.add(self.page)
             self.page.show()
         self.updpagelbl()
@@ -548,8 +570,7 @@ class reader(gtk.Window):
         if self.point is not None:
             self.point = None
         if page is not None:
-            self.profile.props["curpage"] = page.idlist()
-            self.profile.save()
+            self.curpage = page.idlist()
             self.point = ccursor(page, self.cache)
             self.imgfetch.set(imgfetch(self.cache[page]))
         else:
@@ -588,8 +609,10 @@ class reader(gtk.Window):
         if self.page is not None:
             if ev.keyval in [ord('O'), ord('o')]:
                 self.zoom = 1.0
+                self.zmode = "1"
             elif ev.keyval in [ord('P'), ord('p')]:
                 self.zoom = None
+                self.zmode = "fit"
             elif ev.keyval in [ord('[')]:
                 self.zoom = min(self.zoom * 1.25, 3)
             elif ev.keyval in [ord(']')]:
