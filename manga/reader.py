@@ -76,18 +76,20 @@ class imgload(future):
 
     def value(self):
         buf = gtk.gdk.PixbufLoader()
-        with self.page.open() as st:
-            self.p = 0
-            self.st = st
-            while True:
-                read = st.read(1024)
-                if read == "":
-                    break
-                self.p += len(read)
-                buf.write(read)
-                self.progcb()
-        self.st = None
-        buf.close()
+        try:
+            with self.page.open() as st:
+                self.p = 0
+                self.st = st
+                while True:
+                    read = st.read(1024)
+                    if read == "":
+                        break
+                    self.p += len(read)
+                    buf.write(read)
+                    self.progcb()
+            self.st = None
+        finally:
+            buf.close()
         return buf.get_pixbuf()
 
     @property
