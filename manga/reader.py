@@ -295,11 +295,12 @@ class msgproc(object):
         self._prog = None
 
     def prog(self, p):
-        if p is not None and self._prog is None:
-            self._prog = gtk.ProgressBar()
+        if p is not None:
+            if self._prog is None:
+                self._prog = gtk.ProgressBar()
+                self.hlay.pack_start(self._prog, padding=5)
+                self._prog.show()
             self._prog.set_fraction(p)
-            self.hlay.pack_start(self._prog, padding=5)
-            self._prog.show()
         elif p is None and self._prog is not None:
             self.hlay.remove(self._prog)
             self._prog = None
