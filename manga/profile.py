@@ -89,6 +89,9 @@ class manga(object):
         import lib
         return lib.findlib(self.libnm).byid(self.id)
 
+    def save(self):
+        pass
+
 class memmanga(manga):
     def __init__(self, profile, libnm, id):
         super(memmanga, self).__init__(profile, libnm, id)
