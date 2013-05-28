@@ -154,9 +154,13 @@ class manga(lib.manga):
                         except KeyError:
                             pass
                     url = n.a["href"].encode("us-ascii")
-                    if url[-7:] != "/1.html":
+                    if url[-7:] == "/1.html":
+                        url = url[:-6]
+                    elif url[-1:] == "/":
+                        pass
+                    else:
                         raise Exception("parse error: unexpected chapter URL for %r: %s" % (self, url))
-                    vol.ch.append(chapter(vol, vol.stack + [(vol, o)], chid, name, url[:-6]))
+                    vol.ch.append(chapter(vol, vol.stack + [(vol, o)], chid, name, url))
                 cvol.append(vol)
             self.cvol = cvol
         return self.cvol
