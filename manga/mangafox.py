@@ -1,4 +1,4 @@
-import urllib
+import urllib, re
 import BeautifulSoup
 import lib, htcache
 soup = BeautifulSoup.BeautifulSoup
@@ -117,6 +117,8 @@ def nextel(el):
             return el
 
 class manga(lib.manga):
+    cure = re.compile(r"/v\d+/c[\d.]+/$")
+    
     def __init__(self, lib, id, name, url):
         self.lib = lib
         self.id = id
@@ -154,9 +156,13 @@ class manga(lib.manga):
                         except KeyError:
                             pass
                     url = n.a["href"].encode("us-ascii")
-                    if url[-7:] != "/1.html":
+                    if url[-7:] == "/1.html":
+                        url = url[:-6]
+                    elif self.cure.search(url) is not None:
+                        pass
+                    else:
                         raise Exception("parse error: unexpected chapter URL for %r: %s" % (self, url))
-                    vol.ch.append(chapter(vol, vol.stack + [(vol, o)], chid, name, url[:-6]))
+                    vol.ch.append(chapter(vol, vol.stack + [(vol, o)], chid, name, url))
                 cvol.append(vol)
             self.cvol = cvol
         return self.cvol
