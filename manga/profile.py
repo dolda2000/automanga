@@ -196,6 +196,9 @@ class profile(object):
             for nm, (libnm, id) in map.iteritems():
                 f.write(consline("alias", nm, libnm, id) + "\n")
 
+    def file(self, name, mode="r"):
+        return openwdir(pj(self.dir, name), mode)
+
     def getalias(self, nm):
         return self.getaliases()[nm]
 
