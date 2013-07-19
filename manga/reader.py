@@ -213,6 +213,15 @@ class pageview(gtk.Widget):
         self.allocation = alloc
         if self.fit:
             self.zoom = self.fitzoom()
+        else:
+            aw, ah = self.get_asize()
+            zw, zh = self.get_zsize()
+            ox, oy = self.off
+            if zw >= aw and ox + aw > zw:
+                ox = zw - aw
+            if zh >= ah and oy + ah > zh:
+                oy = zh - ah
+            self.off = ox, oy
         if self.flags() & gtk.REALIZED:
             self.window.move_resize(*alloc)
 
