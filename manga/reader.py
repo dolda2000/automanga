@@ -635,9 +635,15 @@ class reader(gtk.Window):
                 self.page.set_off((self.page.get_asize()[0], self.page.off[1]))
         if self.point is not None:
             if ev.keyval in [ord(' ')]:
-                self.fetchpage(self.point.next, lambda page: self.preload.set(preload(relpageget(page, False, self.cache))))
+                if self.page and self.page.off[1] + self.page.get_asize()[1] < self.page.get_zsize()[1]:
+                    self.pan((0, self.page.get_asize()[1] - 50))
+                else:
+                    self.fetchpage(self.point.next, lambda page: self.preload.set(preload(relpageget(page, False, self.cache))))
             elif ev.keyval in [65288]:
-                self.fetchpage(self.point.prev, lambda page: self.preload.set(preload(relpageget(page, True, self.cache))))
+                if self.page and self.page.off[1] > 0:
+                    self.pan((0, -(self.page.get_asize()[1] - 50)))
+                else:
+                    self.fetchpage(self.point.prev, lambda page: self.preload.set(preload(relpageget(page, True, self.cache))))
             elif ev.keyval in [ord('R'), ord('r')]:
                 page = self.point.cur.cur
                 del self.cache[page]
