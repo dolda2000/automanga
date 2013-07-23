@@ -164,3 +164,11 @@ class library(lib.library):
         for manga in self:
             if manga.name.lower()[:len(prefix)] == prefix:
                 yield manga
+
+    def search(self, expr):
+        if not isinstance(expr, unicode):
+            expr = expr.decode("utf8")
+        expr = expr.lower()
+        for manga in self:
+            if expr in manga.name.lower():
+                yield manga

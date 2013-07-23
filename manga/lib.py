@@ -9,6 +9,19 @@ class library(object):
         All libraries should implement this."""
         raise NotImplementedError()
 
+    def search(self, string):
+        """Returns an iterable object of mangas in this library that
+        matches the search string in a library-dependent manner. While
+        each library is at liberty to define its own matching
+        criteria, it is probably likely to involve something akin to
+        searching for keywords in the titles of the library.
+
+        Searching may return very many results and may be slow to
+        iterate.
+
+        Not all libraries need implement this."""
+        raise NotImplementedError()
+
     def byid(self, id):
         """Returns a previously known manga by its string ID, or
         raises KeyError if no such manga could be found.

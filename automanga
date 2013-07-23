@@ -10,13 +10,13 @@ gtk.gdk.threads_init()
 def usage(out):
     out.write("usage: automanga [-h] [-p PROFILE] {DIRECTORY|-l LIBRARY ID|-a ALIAS}\n")
     out.write("       automanga -a ALIAS=LIBRARY:ID\n")
-    out.write("       automanga -s LIBRARY NAME\n")
+    out.write("       automanga -{s|S} LIBRARY NAME\n")
 
 libname = None
-search = False
+search = None
 profile = ""
 alias = None
-opts, args = getopt.getopt(sys.argv[1:], "hl:sp:a:")
+opts, args = getopt.getopt(sys.argv[1:], "hl:sSp:a:")
 for o, a in opts:
     if o == "-h":
         usage(sys.stdout)
@@ -26,7 +26,9 @@ for o, a in opts:
     elif o == "-a":
         alias = a
     elif o == "-s":
-        search = True
+        search = "name"
+    elif o == "-S":
+        search = "match"
     elif o == "-p":
         if a == "":
             profile = None
@@ -49,7 +51,15 @@ if search:
     except ImportError:
         sys.stderr.write("automanga: no such library: %s\n" % args[0])
         sys.exit(1)
-    for manga in lib.byname(args[1]):
+    try:
+        if search == "name":
+            results = lib.byname(args[1])
+        elif search == "match":
+            results = lib.search(args[1])
+    except NotImplementedError:
+        sys.stderr.write("automanga: %s does not support searching\n" % args[0])
+        sys.exit(1)
+    for manga in results:
         sys.stdout.write("\"%s\": %s\n" % (manga.name, manga.id))
     sys.exit(0)
 

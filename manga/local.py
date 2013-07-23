@@ -185,8 +185,13 @@ class directory(dumb):
                 ret.append(manga(pj(self.path, dent)))
         return ret
 
+    def search(self, expr):
+        expr = expr.lower()
+        return [manga(pj(self.path, dent)) for dent in os.listdir(self.path) if expr in dent.lower()]
+
     def __iter__(self):
         for dent in os.listdir(self.path):
             yield manga(pj(self.path, dent))
+
 
 library = dumb
