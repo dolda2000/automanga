@@ -1,5 +1,5 @@
 import urllib, re
-import BeautifulSoup
+import BeautifulSoup, json
 import lib, htcache
 soup = BeautifulSoup.BeautifulSoup
 
@@ -232,6 +232,14 @@ class library(lib.library):
             pno += 1
             ls = self.alphapage(pno)
             i = 0
+
+    def search(self, expr):
+        resp = urllib.urlopen(self.base + ("ajax/search.php?term=%s" % urllib.quote(expr)))
+        try:
+            rc = json.load(resp)
+        finally:
+            resp.close()
+        return [manga(self, id.encode("utf8"), name, self.base + ("manga/%s/" % id.encode("utf8"))) for num, name, id, genres, author in rc]
 
     def byid(self, id):
         url = self.base + ("manga/%s/" % id)
