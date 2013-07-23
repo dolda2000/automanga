@@ -42,92 +42,100 @@ if profile == "":
 elif profile is not None:
     profile = manga.profile.profile.byname(profile)
 
-if search:
-    if len(args) < 2:
-        usage(sys.stderr)
-        sys.exit(1)
-    try:
-        lib = manga.lib.findlib(args[0])
-    except ImportError:
-        sys.stderr.write("automanga: no such library: %s\n" % args[0])
-        sys.exit(1)
-    try:
-        if search == "name":
-            results = lib.byname(args[1])
-        elif search == "match":
-            results = lib.search(args[1])
-    except NotImplementedError:
-        sys.stderr.write("automanga: %s does not support searching\n" % args[0])
-        sys.exit(1)
-    for manga in results:
-        sys.stdout.write("\"%s\": %s\n" % (manga.name, manga.id))
-    sys.exit(0)
+def main():
+    if search:
+        if len(args) < 2:
+            usage(sys.stderr)
+            sys.exit(1)
+        try:
+            lib = manga.lib.findlib(args[0])
+        except ImportError:
+            sys.stderr.write("automanga: no such library: %s\n" % args[0])
+            sys.exit(1)
+        try:
+            if search == "name":
+                results = lib.byname(args[1])
+            elif search == "match":
+                results = lib.search(args[1])
+                if hasattr(results, "__length_hint__"):
+                    sys.stderr.write("%i results:\n" % results.__length_hint__())
+        except NotImplementedError:
+            sys.stderr.write("automanga: %s does not support searching\n" % args[0])
+            sys.exit(1)
+        for mng in results:
+            sys.stdout.write("\"%s\": %s\n" % (mng.name, mng.id))
+        return
 
-if alias and (alias.find('=') > 0):
-    alias, nm = alias.split('=', 1)
-    if not ':' in nm:
-        usage(sys.stderr)
-        sys.exit(1)
-    libname, mid = nm.split(':', 1)
-    try:
-        lib = manga.lib.findlib(libname)
-    except ImportError:
-        sys.stderr.write("automanga: no such library: %s\n" % libname)
-        sys.exit(1)
-    try:
-        mng = lib.byid(mid)
-    except KeyError:
-        sys.stderr.write("automanga: no such manga: %s\n" % mid)
-        sys.exit(1)
-    profile.setalias(alias, libname, mng.id)
-    sys.exit(0)
+    if alias and (alias.find('=') > 0):
+        alias, nm = alias.split('=', 1)
+        if not ':' in nm:
+            usage(sys.stderr)
+            sys.exit(1)
+        libname, mid = nm.split(':', 1)
+        try:
+            lib = manga.lib.findlib(libname)
+        except ImportError:
+            sys.stderr.write("automanga: no such library: %s\n" % libname)
+            sys.exit(1)
+        try:
+            mng = lib.byid(mid)
+        except KeyError:
+            sys.stderr.write("automanga: no such manga: %s\n" % mid)
+            sys.exit(1)
+        profile.setalias(alias, libname, mng.id)
+        return
 
-if alias:
-    try:
-        libname, mid = profile.getalias(alias)
-    except KeyError:
-        sys.stderr("automanga: no such alias: %s\n" % alias)
-        sys.exit(1)
-    try:
-        lib = manga.lib.findlib(libname)
-    except ImportError:
-        sys.stderr.write("automanga: no such library: %s\n" % libname)
-        sys.exit(1)
-    try:
-        mng = lib.byid(mid)
-    except KeyError:
-        sys.stderr.write("automanga: manga no longer found: %s\n" % mid)
-        sys.exit(1)
-elif libname is not None:
-    if len(args) < 1:
-        usage(sys.stderr)
-        sys.exit(1)
-    try:
-        lib = manga.lib.findlib(libname)
-    except ImportError:
-        sys.stderr.write("automanga: no such library: %s\n" % libname)
-        sys.exit(1)
-    try:
-        mng = lib.byid(args[0])
-    except KeyError:
-        sys.stderr.write("automanga: no such manga: %s\n" % args[0])
-        sys.exit(1)
-else:
-    libname = "local"
-    try:
-        if len(args) > 0:
-            mdir = args[0]
-        else:
-            mdir = "."
-        mng = manga.local.manga(mdir)
-    except TypeError:
-        sys.stderr.write("automanga: not a valid manga directory: %s\n" % mdir)
-        sys.exit(1)
+    if alias:
+        try:
+            libname, mid = profile.getalias(alias)
+        except KeyError:
+            sys.stderr("automanga: no such alias: %s\n" % alias)
+            sys.exit(1)
+        try:
+            lib = manga.lib.findlib(libname)
+        except ImportError:
+            sys.stderr.write("automanga: no such library: %s\n" % libname)
+            sys.exit(1)
+        try:
+            mng = lib.byid(mid)
+        except KeyError:
+            sys.stderr.write("automanga: manga no longer found: %s\n" % mid)
+            sys.exit(1)
+    elif libname is not None:
+        if len(args) < 1:
+            usage(sys.stderr)
+            sys.exit(1)
+        try:
+            lib = manga.lib.findlib(libname)
+        except ImportError:
+            sys.stderr.write("automanga: no such library: %s\n" % libname)
+            sys.exit(1)
+        try:
+            mng = lib.byid(args[0])
+        except KeyError:
+            sys.stderr.write("automanga: no such manga: %s\n" % args[0])
+            sys.exit(1)
+    else:
+        libname = "local"
+        try:
+            if len(args) > 0:
+                mdir = args[0]
+            else:
+                mdir = "."
+            mng = manga.local.manga(mdir)
+        except TypeError:
+            sys.stderr.write("automanga: not a valid manga directory: %s\n" % mdir)
+            sys.exit(1)
 
-mprof = None if profile is None else profile.getmanga(libname, mng.id, True)
-if profile is not None:
-    profile.setlast()
+    mprof = None if profile is None else profile.getmanga(libname, mng.id, True)
+    if profile is not None:
+        profile.setlast()
 
-reader = manga.reader.reader(mng, mprof)
-reader.show()
-gtk.main()
+    reader = manga.reader.reader(mng, mprof)
+    reader.show()
+    gtk.main()
+
+try:
+    main()
+except KeyboardInterrupt:
+    pass
