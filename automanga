@@ -81,8 +81,8 @@ def main():
             sys.exit(1)
         try:
             mng = lib.byid(mid)
-        except KeyError:
-            sys.stderr.write("automanga: no such manga: %s\n" % mid)
+        except KeyError as e:
+            sys.stderr.write("automanga: no such manga: %s\n" % str(e))
             sys.exit(1)
         profile.setalias(tgt, libname, mng.id)
         return
@@ -114,8 +114,8 @@ def main():
             sys.exit(1)
         try:
             mng = lib.byid(args[0])
-        except KeyError:
-            sys.stderr.write("automanga: no such manga: %s\n" % args[0])
+        except KeyError as e:
+            sys.stderr.write("automanga: no such manga: %s\n" % str(e))
             sys.exit(1)
     else:
         libname = "local"
