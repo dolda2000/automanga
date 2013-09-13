@@ -117,7 +117,7 @@ def nextel(el):
             return el
 
 class manga(lib.manga):
-    cure = re.compile(r"/v\d+/c[\d.]+/$")
+    cure = re.compile(r"/c[\d.]+/$")
     
     def __init__(self, lib, id, name, url):
         self.lib = lib
