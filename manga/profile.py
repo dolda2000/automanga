@@ -60,6 +60,13 @@ def splitline(line):
         ret.append(buf)
     return ret
 
+def splitlines(fp):
+    for line in fp:
+        cur = splitline(line)
+        if len(cur) < 1:
+            continue
+        yield cur
+
 def consline(*words):
     buf = ""
     for w in words:
@@ -99,17 +106,72 @@ class memmanga(manga):
     def loadprops(self):
         return {}
 
+class tagview(object):
+    def __init__(self, manga):
+        self.manga = manga
+        self.profile = manga.profile
+
+    def add(self, *tags):
+        mt = self.getall(self.profile)
+        ctags = mt.setdefault((self.manga.libnm, self.manga.id), set())
+        ctags |= set(tags)
+        self.save(self.profile, mt)
+
+    def remove(self, *tags):
+        mt = self.getall(self.profile)
+        ctags = mt.get((self.manga.libnm, self.manga.id), set())
+        ctags -= set(tags)
+        if len(ctags) < 1:
+            try:
+                del mt[self.manga.libnm, self.manga.id]
+            except KeyError:
+                pass
+        self.save(self.profile, mt)
+
+    def __iter__(self):
+        return iter(self.getall(self.profile).get((self.manga.libnm, self.manga.id), set()))
+
+    @staticmethod
+    def getall(profile):
+        ret = {}
+        try:
+            with profile.file("tags") as fp:
+                for words in splitlines(fp):
+                    libnm, id = words[0:2]
+                    tags = set(words[2:])
+                    ret[libnm, id] = tags
+        except IOError:
+            pass
+        return ret
+
+    @staticmethod
+    def save(profile, m):
+        with profile.file("tags", "w") as fp:
+            for (libnm, id), tags in m.iteritems():
+                fp.write(consline(libnm, id, *tags) + "\n")
+
+    @staticmethod
+    def bytag(profile, tag):
+        try:
+            with profile.file("tags") as fp:
+                for words in splitlines(fp):
+                    libnm, id = words[0:2]
+                    tags = words[2:]
+                    if tag in tags:
+                        yield profile.getmanga(libnm, id)
+        except IOError:
+            pass
+
 class filemanga(manga):
     def __init__(self, profile, libnm, id, path):
         self.path = path
         super(filemanga, self).__init__(profile, libnm, id)
+        self.tags = tagview(self)
 
     def loadprops(self):
         ret = {}
         with openwdir(self.path) as f:
-            for line in f:
-                words = splitline(line)
-                if len(words) < 1: continue
+            for words in splitlines(f):
                 if words[0] == "set" and len(words) > 2:
                     ret[words[1]] = words[2]
                 elif words[0] == "lset" and len(words) > 1:
@@ -134,10 +196,7 @@ class profile(object):
         ret = {}
         if os.path.exists(pj(self.dir, "map")):
             with openwdir(pj(self.dir, "map")) as f:
-                for ln in f:
-                    words = splitline(ln)
-                    if len(words) < 1:
-                        continue
+                for words in splitlines(f):
                     if words[0] == "seq" and len(words) > 1:
                         try:
                             seq = int(words[1])
@@ -206,6 +265,9 @@ class profile(object):
         aliases = self.getaliases()
         aliases[nm] = libnm, id
         self.savealiases(aliases)
+
+    def bytag(self, tag):
+        return tagview.bytag(self, tag)
 
     @classmethod
     def byname(cls, name):
