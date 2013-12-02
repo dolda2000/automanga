@@ -10,13 +10,17 @@ gtk.gdk.threads_init()
 def usage(out):
     out.write("usage: automanga [-h] [-p PROFILE] {DIRECTORY|-l LIBRARY ID|-a ALIAS}\n")
     out.write("       automanga -a ALIAS=LIBRARY:ID\n")
+    out.write("       automanga -t {DIRECTORY|-l LIBRARY ID|-a ALIAS} [-]TAG...\n")
     out.write("       automanga -{s|S} LIBRARY NAME\n")
+    out.write("       automanga -L TAG\n")
 
 libname = None
 search = None
 profile = ""
 alias = None
-opts, args = getopt.getopt(sys.argv[1:], "hl:sSp:a:")
+settags = False
+listtag = None
+opts, args = getopt.getopt(sys.argv[1:], "hl:sSp:a:tL:")
 for o, a in opts:
     if o == "-h":
         usage(sys.stdout)
@@ -34,6 +38,10 @@ for o, a in opts:
             profile = None
         else:
             profile = a
+    elif o == "-t":
+        settags = True
+    elif o == "-L":
+        listtag = a
 if profile == "":
     try:
         profile = manga.profile.profile.last()
@@ -66,6 +74,13 @@ def main():
             sys.exit(1)
         for mng in results:
             sys.stdout.write("\"%s\": %s\n" % (mng.name, mng.id))
+        return
+
+    if listtag is not None:
+        if profile is not None:
+            for mprof in profile.bytag(listtag):
+                mng = mprof.open()
+                sys.stdout.write("%s %s: \"%s\"\n" % (mprof.libnm, mprof.id, mng.name))
         return
 
     if alias and (alias.find('=') > 0):
@@ -113,7 +128,7 @@ def main():
             sys.stderr.write("automanga: no such library: %s\n" % libname)
             sys.exit(1)
         try:
-            mng = lib.byid(args[0])
+            mng = lib.byid(args.pop(0))
         except KeyError as e:
             sys.stderr.write("automanga: no such manga: %s\n" % str(e))
             sys.exit(1)
@@ -121,7 +136,7 @@ def main():
         libname = "local"
         try:
             if len(args) > 0:
-                mdir = args[0]
+                mdir = args.pop(0)
             else:
                 mdir = "."
             mng = manga.local.manga(mdir)
@@ -132,6 +147,15 @@ def main():
     mprof = None if profile is None else profile.getmanga(libname, mng.id, True)
     if profile is not None:
         profile.setlast()
+
+    if settags:
+        if mprof is not None:
+            ntags = [tag for tag in args if tag[:1] != "-"]
+            rtags = [tag[1:] for tag in args if tag[:1] == "-"]
+            print ntags, rtags
+            if ntags: mprof.tags.add(*ntags)
+            if rtags: mprof.tags.remove(*rtags)
+        return
 
     reader = manga.reader.reader(mng, mprof)
     reader.show()
