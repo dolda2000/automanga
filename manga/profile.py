@@ -6,14 +6,40 @@ if home is None or not os.path.isdir(home):
     raise Exception("Could not find home directory for profile keeping")
 basedir = pj(home, ".manga", "profiles")
 
+class txfile(file):
+    def __init__(self, name, mode):
+        self.realname = name
+        self.tempname = name + ".new"
+        super(txfile, self).__init__(self.tempname, mode)
+
+    def close(self, abort=False):
+        super(txfile, self).close()
+        if abort:
+            os.unlink(self.tempname)
+        else:
+            os.rename(self.tempname, self.realname)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        if exc_info[0] is not None:
+            self.close(True)
+        else:
+            self.close(False)
+
 def openwdir(nm, mode="r"):
+    ft = file
+    if mode == "W":
+        mode = "w"
+        ft = txfile
     if os.path.exists(nm):
-        return open(nm, mode)
+        return ft(nm, mode)
     if mode != "r":
         d = os.path.dirname(nm)
         if not os.path.isdir(d):
             os.makedirs(d)
-    return open(nm, mode)
+    return ft(nm, mode)
 
 def splitline(line):
     def bsq(c):
@@ -146,7 +172,7 @@ class tagview(object):
 
     @staticmethod
     def save(profile, m):
-        with profile.file("tags", "w") as fp:
+        with profile.file("tags", "W") as fp:
             for (libnm, id), tags in m.iteritems():
                 fp.write(consline(libnm, id, *tags) + "\n")
 
@@ -179,7 +205,7 @@ class filemanga(manga):
         return ret
 
     def save(self):
-        with openwdir(self.path, "w") as f:
+        with openwdir(self.path, "W") as f:
             for key, val in self.props.iteritems():
                 if isinstance(val, str):
                     f.write(consline("set", key, val) + "\n")
@@ -210,7 +236,7 @@ class profile(object):
         return seq, ret
 
     def savemapping(self, seq, m):
-        with openwdir(pj(self.dir, "map"), "w") as f:
+        with openwdir(pj(self.dir, "map"), "W") as f:
             f.write(consline("seq", str(seq)) + "\n")
             for (libnm, id), num in m.iteritems():
                 f.write(consline("manga", libnm, id, str(num)) + "\n")
@@ -236,7 +262,7 @@ class profile(object):
     def setlast(self):
         if self.name is None:
             raise ValueError("profile at " + self.dir + " has no name")
-        with openwdir(pj(basedir, "last"), "w") as f:
+        with openwdir(pj(basedir, "last"), "W") as f:
             f.write(self.name + "\n")
 
     def getaliases(self):
@@ -251,7 +277,7 @@ class profile(object):
         return ret
 
     def savealiases(self, map):
-        with openwdir(pj(self.dir, "alias"), "w") as f:
+        with openwdir(pj(self.dir, "alias"), "W") as f:
             for nm, (libnm, id) in map.iteritems():
                 f.write(consline("alias", nm, libnm, id) + "\n")
 
