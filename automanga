@@ -152,7 +152,6 @@ def main():
         if mprof is not None:
             ntags = [tag for tag in args if tag[:1] != "-"]
             rtags = [tag[1:] for tag in args if tag[:1] == "-"]
-            print ntags, rtags
             if ntags: mprof.tags.add(*ntags)
             if rtags: mprof.tags.remove(*rtags)
         return
