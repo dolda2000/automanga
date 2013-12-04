@@ -109,9 +109,12 @@ class manga(lib.manga):
                         cid = m.group(1)
                         url = self.lib.base + "read/_/" + cid
                         name = ch.td.a.text
-                        cch.append(chapter(self, [(self, len(cch))], cid, name, url))
+                        cch.append((cid, name, url))
             cch.reverse()
-            self.cch = cch
+            rch = []
+            for n, (cid, name, url) in enumerate(cch):
+                rch.append(chapter(self, [(self, n)], cid, name, url))
+            self.cch = rch
         return self.cch
 
     def __str__(self):
