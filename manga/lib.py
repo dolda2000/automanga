@@ -154,6 +154,36 @@ class imgstream(object):
         stream of SZ is not given."""
         raise NotImplementedError()
 
+class stdimgstream(imgstream):
+    """A standard implementation of imgstream, for libraries which
+    have no particular implementation requirements."""
+
+    def __init__(self, url):
+        import urllib
+        self.bk = urllib.urlopen(url)
+        ok = False
+        try:
+            if self.bk.getcode() != 200:
+                raise IOError("Server error: " + str(self.bk.getcode()))
+            self.ctype = self.bk.info()["Content-Type"]
+            self.clen = int(self.bk.info()["Content-Length"])
+            ok = True
+        finally:
+            if not ok:
+                self.bk.close()
+
+    def fileno(self):
+        return self.bk.fileno()
+
+    def close(self):
+        self.bk.close()
+
+    def read(self, sz = None):
+        if sz is None:
+            return self.bk.read()
+        else:
+            return self.bk.read(sz)
+
 class cursor(object):
     def __init__(self, ob):
         if isinstance(ob, cursor):

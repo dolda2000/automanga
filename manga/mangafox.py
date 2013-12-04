@@ -3,32 +3,6 @@ import BeautifulSoup, json
 import lib, htcache
 soup = BeautifulSoup.BeautifulSoup
 
-class imgstream(lib.imgstream):
-    def __init__(self, url):
-        self.bk = urllib.urlopen(url)
-        ok = False
-        try:
-            if self.bk.getcode() != 200:
-                raise IOError("Server error: " + str(self.bk.getcode()))
-            self.ctype = self.bk.info()["Content-Type"]
-            self.clen = int(self.bk.info()["Content-Length"])
-            ok = True
-        finally:
-            if not ok:
-                self.bk.close()
-
-    def fileno(self):
-        return self.bk.fileno()
-
-    def close(self):
-        self.bk.close()
-
-    def read(self, sz = None):
-        if sz is None:
-            return self.bk.read()
-        else:
-            return self.bk.read(sz)
-
 class page(lib.page):
     def __init__(self, chapter, stack, n, url):
         self.stack = stack
@@ -48,7 +22,7 @@ class page(lib.page):
         return self.ciurl
 
     def open(self):
-        return imgstream(self.iurl())
+        return lib.stdimgstream(self.iurl())
 
     def __str__(self):
         return self.name
