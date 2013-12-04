@@ -13,6 +13,9 @@ class cache(object):
     def miss(self, url):
         s = urllib.urlopen(url)
         try:
+            if s.headers.get("content-encoding") == "gzip":
+                import gzip, StringIO
+                return gzip.GzipFile(fileobj=StringIO.StringIO(s.read()), mode="r").read()
             return s.read()
         finally:
             s.close()
