@@ -83,6 +83,7 @@ class manga(lib.manga):
         self.url = url
         self.cch = None
         self.stack = []
+        self.cnames = None
 
     def __getitem__(self, i):
         return self.ch()[i]
@@ -116,6 +117,26 @@ class manga(lib.manga):
                 rch.append(chapter(self, [(self, n)], cid, name, url))
             self.cch = rch
         return self.cch
+
+    def altnames(self):
+        if self.cnames is None:
+            page = soup(htcache.fetch(self.url))
+            cnames = None
+            for tbl in page.findAll("table", attrs={"class": "ipb_table"}):
+                if tbl.tbody is not None: tbl = tbl.tbody
+                for tr in tbl.findAll("tr"):
+                    if u"Alt Names:" in tr.td.text:
+                        nls = nextel(tr.td)
+                        if nls.name != u"td" or nls.span is None:
+                            raise Exception("Weird altnames table in " + self.id)
+                        cnames = [nm.text.strip() for nm in nls.findAll("span")]
+                        break
+                if cnames is not None:
+                    break
+            if cnames is None:
+                raise Exception("Could not find altnames for " + self.id)
+            self.cnames = cnames
+        return self.cnames
 
     def __str__(self):
         return self.name
@@ -158,3 +179,45 @@ class library(lib.library):
                 name = info.h3.a.string.strip()
                 ret.append(manga(self, id, name, url))
         return ret
+
+    rure = re.compile(r"/comic/_/([^/]*)$")
+    def byname(self, prefix):
+        if not isinstance(prefix, unicode):
+            prefix = prefix.decode("utf8")
+        p = 1
+        while True:
+            resp = urllib.urlopen(self.base + "search?" + urllib.urlencode({"name": prefix.encode("utf8"), "name_cond": "s", "p": str(p)}))
+            try:
+                page = soup(resp.read())
+            finally:
+                resp.close()
+            rls = page.find("div", id="comic_search_results").table
+            if rls.tbody is not None:
+                rls = rls.tbody
+            hasmore = False
+            for child in rls.findAll("tr"):
+                if child.th is not None: continue
+                if child.get("id") == u"show_more_row":
+                    hasmore = True
+                    continue
+                link = child.td.strong.a
+                url = link["href"].encode("us-ascii")
+                m = self.rure.search(url)
+                if m is None: raise Exception("Got weird manga URL: %r" % url)
+                id = m.group(1)
+                name = link.text.strip()
+                if name[:len(prefix)].lower() != prefix.lower():
+                    m = manga(self, id, name, url)
+                    for aname in m.altnames():
+                        if aname[:len(prefix)].lower() == prefix.lower():
+                            name = aname
+                            break
+                    else:
+                        if False:
+                            print "eliding " + name
+                            print m.altnames()
+                        continue
+                yield manga(self, id, name, url)
+            p += 1
+            if not hasmore:
+                break
