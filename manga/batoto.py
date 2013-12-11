@@ -144,6 +144,9 @@ class library(lib.library):
             page = soup(resp.read())
         finally:
             resp.close()
+        none = page.find("p", attrs={"class": "no_messages"})
+        if none is not None and u"No results" in none.text:
+            return []
         ret = []
         for child in page.find("div", id="search_results").ol.childGenerator():
             if isinstance(child, BeautifulSoup.Tag) and child.name == u"li":
