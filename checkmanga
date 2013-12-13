@@ -1,0 +1,105 @@
+#!/usr/bin/python
+
+import sys, getopt
+import manga.lib, manga.profile
+
+def usage(out):
+    out.write("usage: checkmanga [-hSi] [-p PROFILE] TAG\n")
+
+prnm = ""
+save = iact = False
+opts, args = getopt.getopt(sys.argv[1:], "hSip:")
+for o, a in opts:
+    if o == "-h":
+        usage(sys.stdout)
+        sys.exit(0)
+    elif o == "-S":
+        save = True
+    elif o == "-p":
+        prnm = a
+    elif o == "-i":
+        iact = True
+if prnm == "":
+    profile = manga.profile.profile.last()
+else:
+    profile = manga.profile.profile.byname(prnm)
+if len(args) < 1:
+    usage(sys.stderr)
+    sys.exit(1)
+tag = args[0]
+
+def getpages(pr):
+    try:
+        fp = pr.file("lastpages")
+    except IOError:
+        return {}
+    ret = {}
+    with fp:
+        for ln in fp:
+            words = manga.profile.splitline(ln)
+            ret[tuple(words[:2])] = [int(x) for x in words[2:]]
+    return ret
+
+def savepages(pr, pages):
+    with pr.file("lastpages", "w") as fp:
+        for (libnm, id), pl in pages.iteritems():
+            fp.write(manga.profile.consline(libnm, id, *[str(x) for x in pl]) + "\n")
+
+def prompt(q):
+    with open("/dev/tty", "r+") as tp:
+        tp.write(q); tp.flush()
+        return tp.readline().strip()
+
+def lastpage(m):
+    ret = []
+    while isinstance(m, manga.lib.pagelist):
+        ret.append(len(m) - 1)
+        m = m[len(m) - 1]
+    return ret
+
+lastpages = getpages(profile)
+
+changed = False
+for mp in profile.bytag(tag):
+    try:
+        try:
+            m = mp.open()
+        except:
+            sys.stderr.write("checkmanga: could not open %s/%s\n" % (libnm, id))
+            continue
+        nlp = lastpage(m)
+        ch = False
+        if (mp.libnm, mp.id) in lastpages:
+            clp = lastpages[mp.libnm, mp.id]
+            if clp != nlp:
+                try:
+                    clpn = u""
+                    p = m
+                    for pn in clp:
+                        p = p[pn]
+                        if clpn != "":
+                            clpn += ", "
+                        clpn += p.name
+                    sys.stdout.write("%s %s: %s\n" % (mp.libnm, mp.id, str(clpn)))
+                    ch = True
+                except IndexError:
+                    sys.stdout.write("%s %s: structure changed\n" % (mp.libnm, mp.id))
+                    ch = True
+        else:
+            sys.stdout.write("%s %s: not previously checked\n" % (mp.libnm, mp.id))
+            ch = True
+        if ch:
+            savecur = False
+            if save:
+                savecur = True
+            elif iact:
+                if prompt("Save? ")[:1].lower() == "y":
+                    savecur = True
+            if savecur:
+                lastpages[mp.libnm, mp.id] = nlp
+                changed = True
+    except:
+        sys.stderr.write("checkmanga: unexpected error when checking %s/%s:\n" % (mp.libnm, mp.id))
+        raise
+if changed:
+    savepages(profile, lastpages)
