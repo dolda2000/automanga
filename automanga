@@ -79,7 +79,11 @@ def main():
     if listtag is not None:
         if profile is not None:
             for mprof in profile.bytag(listtag):
-                mng = mprof.open()
+                try:
+                    mng = mprof.open()
+                except KeyError:
+                    sys.stderr.write("%s %s: no longer found\n" % (mprof.libnm, mprof.id))
+                    continue
                 sys.stdout.write("%s %s: \"%s\"\n" % (mprof.libnm, mprof.id, mng.name))
         return
 
