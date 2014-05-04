@@ -157,36 +157,12 @@ class library(lib.library):
             raise KeyError(id)
         return manga(self, id, title.string.strip(), url)
 
-    mure = re.compile(r"/comic/_/comics/([^/]*)$")
-    def search(self, expr):
-        resp = urllib.urlopen(self.base + "forums/index.php?app=core&module=search&do=search&fromMainBar=1",
-                              urllib.urlencode({"search_term": expr, "search_app": "ccs:database:3"}))
-        try:
-            page = soup(resp.read())
-        finally:
-            resp.close()
-        none = page.find("p", attrs={"class": "no_messages"})
-        if none is not None and u"No results" in none.text:
-            return []
-        ret = []
-        for child in page.find("div", id="search_results").ol.childGenerator():
-            if isinstance(child, BeautifulSoup.Tag) and child.name == u"li":
-                info = child.find("div", attrs={"class": "result_info"})
-                url = info.h3.a["href"].encode("us-ascii")
-                m = self.mure.search(url)
-                if m is None: raise Exception("Got weird manga URL: %r" % url)
-                id = m.group(1)
-                name = info.h3.a.string.strip()
-                ret.append(manga(self, id, name, url))
-        return ret
-
-    rure = re.compile(r"/comic/_/([^/]*)$")
-    def byname(self, prefix):
-        if not isinstance(prefix, unicode):
-            prefix = prefix.decode("utf8")
+    def _search(self, pars):
         p = 1
         while True:
-            resp = urllib.urlopen(self.base + "search?" + urllib.urlencode({"name": prefix.encode("utf8"), "name_cond": "s", "p": str(p)}))
+            _pars = dict(pars)
+            _pars["p"] = str(p)
+            resp = urllib.urlopen(self.base + "search?" + urllib.urlencode(_pars))
             try:
                 page = soup(resp.read())
             finally:
@@ -197,6 +173,7 @@ class library(lib.library):
             hasmore = False
             for child in rls.findAll("tr"):
                 if child.th is not None: continue
+                if child.get("id", u"")[:11] == u"comic_rowo_": continue
                 if child.get("id") == u"show_more_row":
                     hasmore = True
                     continue
@@ -206,18 +183,29 @@ class library(lib.library):
                 if m is None: raise Exception("Got weird manga URL: %r" % url)
                 id = m.group(1)
                 name = link.text.strip()
-                if name[:len(prefix)].lower() != prefix.lower():
-                    m = manga(self, id, name, url)
-                    for aname in m.altnames():
-                        if aname[:len(prefix)].lower() == prefix.lower():
-                            name = aname
-                            break
-                    else:
-                        if False:
-                            print "eliding " + name
-                            print m.altnames()
-                        continue
                 yield manga(self, id, name, url)
             p += 1
             if not hasmore:
                 break
+
+    rure = re.compile(r"/comic/_/([^/]*)$")
+    def search(self, expr):
+        if not isinstance(expr, unicode):
+            expr = expr.decode("utf8")
+        return self._search({"name": expr.encode("utf8"), "name_cond": "c"})
+
+    def byname(self, prefix):
+        if not isinstance(prefix, unicode):
+            prefix = prefix.decode("utf8")
+        for res in self._search({"name": prefix.encode("utf8"), "name_cond": "s"}):
+            if res.name[:len(prefix)].lower() == prefix.lower():
+                yield res
+            else:
+                for aname in res.altnames():
+                    if aname[:len(prefix)].lower() == prefix.lower():
+                        yield manga(self, res.id, aname, res.url)
+                        break
+                else:
+                    if False:
+                        print "eliding " + res.name
+                        print res.altnames()
