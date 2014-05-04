@@ -79,8 +79,11 @@ def main():
     if listtag is not None:
         if profile is not None:
             for mprof in profile.bytag(listtag):
-                mng = mprof.open()
-                sys.stdout.write("%s %s: \"%s\"\n" % (mprof.libnm, mprof.id, mng.name))
+                try:
+                    mng = mprof.open()
+                    sys.stdout.write("%s %s: \"%s\"\n" % (mprof.libnm, mprof.id, mng.name))
+                except KeyError:
+                    sys.stdout.write("%s %s: no longer exists\n" % (mprof.libnm, mprof.id))
         return
 
     if alias and (alias.find('=') > 0):
