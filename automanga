@@ -81,9 +81,10 @@ def main():
             for mprof in profile.bytag(listtag):
                 try:
                     mng = mprof.open()
-                    sys.stdout.write("%s %s: \"%s\"\n" % (mprof.libnm, mprof.id, mng.name))
                 except KeyError:
-                    sys.stdout.write("%s %s: no longer exists\n" % (mprof.libnm, mprof.id))
+                    sys.stderr.write("%s %s: no longer found\n" % (mprof.libnm, mprof.id))
+                    continue
+                sys.stdout.write("%s %s: \"%s\"\n" % (mprof.libnm, mprof.id, mng.name))
         return
 
     if alias and (alias.find('=') > 0):
