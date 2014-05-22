@@ -2,6 +2,7 @@ import urllib, re
 import BeautifulSoup, json
 import lib, htcache
 soup = BeautifulSoup.BeautifulSoup
+soupify = lambda cont: soup(cont, convertEntities=soup.HTML_ENTITIES)
 
 class page(lib.page):
     def __init__(self, chapter, stack, n, url):
@@ -17,7 +18,7 @@ class page(lib.page):
 
     def iurl(self):
         if self.ciurl is None:
-            page = soup(htcache.fetch(self.url))
+            page = soupify(htcache.fetch(self.url))
             self.ciurl = page.find("div", id="viewer").find("img", id="image")["src"]
         return self.ciurl
 
@@ -48,7 +49,7 @@ class chapter(lib.pagelist):
 
     def pages(self):
         if self.cpag is None:
-            pg = soup(htcache.fetch(self.url + "1.html"))
+            pg = soupify(htcache.fetch(self.url + "1.html"))
             l = pg.find("form", id="top_bar").find("div", attrs={"class": "l"})
             if len(l.contents) != 3:
                 raise Exception("parse error: weird page list for %r" % self)
@@ -109,7 +110,7 @@ class manga(lib.manga):
 
     def vols(self):
         if self.cvol is None:
-            page = soup(htcache.fetch(self.url))
+            page = soupify(htcache.fetch(self.url))
             vls = page.find("div", id="chapters").findAll("div", attrs={"class": "slide"})
             cvol = []
             for i, vn in enumerate(reversed(vls)):
@@ -155,7 +156,7 @@ class library(lib.library):
         self.base = "http://mangafox.me/"
 
     def alphapage(self, pno):
-        page = soup(htcache.fetch(self.base + ("directory/%i.htm?az" % pno)))
+        page = soupify(htcache.fetch(self.base + ("directory/%i.htm?az" % pno)))
         ls = page.find("div", id="mangalist").find("ul", attrs={"class": "list"}).findAll("li")
         ret = []
         ubase = self.base + "manga/"
@@ -169,7 +170,7 @@ class library(lib.library):
         return ret
 
     def alphapages(self):
-        page = soup(htcache.fetch(self.base + "directory/?az"))
+        page = soupify(htcache.fetch(self.base + "directory/?az"))
         ls = page.find("div", id="mangalist").find("div", id="nav").find("ul").findAll("li")
         return int(ls[-2].find("a").string)
 
@@ -217,7 +218,7 @@ class library(lib.library):
 
     def byid(self, id):
         url = self.base + ("manga/%s/" % id)
-        page = soup(htcache.fetch(url))
+        page = soupify(htcache.fetch(url))
         if page.find("div", id="title") is None:
             # Assume we got the search page
             raise KeyError(id)

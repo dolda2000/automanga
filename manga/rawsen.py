@@ -1,6 +1,7 @@
 import BeautifulSoup, urlparse
 import lib, htcache
 soup = BeautifulSoup.BeautifulSoup
+soupify = lambda cont: soup(cont, convertEntities=soup.HTML_ENTITIES)
 
 class page(lib.page):
     def __init__(self, chapter, stack, n, url):
@@ -15,7 +16,7 @@ class page(lib.page):
 
     def iurl(self):
         if self.ciurl is None:
-            page = soup(htcache.fetch(self.url))
+            page = soupify(htcache.fetch(self.url))
             for tr in page.findAll("tr"):
                 img = tr.find("img", id="picture")
                 if img is not None:
@@ -53,7 +54,7 @@ class chapter(lib.pagelist):
             if self.url[-2:] != "/1":
                 raise Exception("parse error: unexpected first page url for %r" % self)
             base = self.url[:-1]
-            pg = soup(htcache.fetch(self.url))
+            pg = soupify(htcache.fetch(self.url))
             pag = []
             for opt in pg.find("div", attrs={"class": "pager"}).find("select", attrs={"name": "page"}).findAll("option"):
                 n = int(opt["value"])
@@ -85,7 +86,7 @@ class manga(lib.manga):
 
     def ch(self):
         if self.cch is None:
-            page = soup(htcache.fetch(self.url))
+            page = soupify(htcache.fetch(self.url))
             cls = None
             for div in page.findAll("div", attrs={"class": "post"}):
                 if div.h3 is not None and u"Chapter List" in div.h3.string:
@@ -117,7 +118,7 @@ class library(lib.library):
 
     def byid(self, id):
         url = urlparse.urljoin(self.base, id + "/")
-        page = soup(htcache.fetch(url))
+        page = soupify(htcache.fetch(url))
         name = None
         for div in page.findAll("div", attrs={"class": "post"}):
             if div.h2 is not None and div.h2.a is not None:
@@ -130,7 +131,7 @@ class library(lib.library):
         return manga(self, id, name, url)
 
     def __iter__(self):
-        page = soup(htcache.fetch(self.base + "Manga/"))
+        page = soupify(htcache.fetch(self.base + "Manga/"))
         for part in page.find("div", attrs={"class": "post"}).findAll("table"):
             for row in part.findAll("tr"):
                 link = row.findAll("td")[1].a

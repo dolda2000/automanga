@@ -1,6 +1,7 @@
 import urllib, re, BeautifulSoup
 import lib, htcache
 soup = BeautifulSoup.BeautifulSoup
+soupify = lambda cont: soup(cont, convertEntities=soup.HTML_ENTITIES)
 
 def byclass(el, name, cl):
     for ch in el.findAll(name):
@@ -28,7 +29,7 @@ class page(lib.page):
 
     def iurl(self):
         if self.ciurl is None:
-            page = soup(htcache.fetch(self.url))
+            page = soupify(htcache.fetch(self.url))
             img = nextel(page.find("div", id="full_image")).img
             self.ciurl = img["src"].encode("us-ascii")
         return self.ciurl
@@ -60,7 +61,7 @@ class chapter(lib.pagelist):
     pnre = re.compile(r"page (\d+)")
     def pages(self):
         if self.cpag is None:
-            pg = soup(htcache.fetch(self.url))
+            pg = soupify(htcache.fetch(self.url))
             cpag = []
             for opt in pg.find("select", id="page_select").findAll("option"):
                 url = opt["value"].encode("us-ascii")
@@ -94,7 +95,7 @@ class manga(lib.manga):
     cure = re.compile(r"/read/_/(\d+)/[^/]*")
     def ch(self):
         if self.cch is None:
-            page = soup(htcache.fetch(self.url))
+            page = soupify(htcache.fetch(self.url))
             cls = byclass(page, u"table", u"chapters_list")
             if cls.tbody is not None:
                 cls = cls.tbody
@@ -120,7 +121,7 @@ class manga(lib.manga):
 
     def altnames(self):
         if self.cnames is None:
-            page = soup(htcache.fetch(self.url))
+            page = soupify(htcache.fetch(self.url))
             cnames = None
             for tbl in page.findAll("table", attrs={"class": "ipb_table"}):
                 if tbl.tbody is not None: tbl = tbl.tbody
@@ -151,7 +152,7 @@ class library(lib.library):
 
     def byid(self, id):
         url = self.base + "comic/_/comics/" + id
-        page = soup(htcache.fetch(url))
+        page = soupify(htcache.fetch(url))
         title = page.find("h1", attrs={"class": "ipsType_pagetitle"})
         if title is None:
             raise KeyError(id)
@@ -164,7 +165,7 @@ class library(lib.library):
             _pars["p"] = str(p)
             resp = urllib.urlopen(self.base + "search?" + urllib.urlencode(_pars))
             try:
-                page = soup(resp.read())
+                page = soupify(resp.read())
             finally:
                 resp.close()
             rls = page.find("div", id="comic_search_results").table

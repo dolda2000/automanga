@@ -1,6 +1,7 @@
 import BeautifulSoup, urlparse
 import lib, htcache
 soup = BeautifulSoup.BeautifulSoup
+soupify = lambda cont: soup(cont, convertEntities=soup.HTML_ENTITIES)
 
 class page(lib.page):
     def __init__(self, chapter, stack, n, url):
@@ -15,7 +16,7 @@ class page(lib.page):
 
     def iurl(self):
         if self.ciurl is None:
-            page = soup(htcache.fetch(self.url))
+            page = soupify(htcache.fetch(self.url))
             self.ciurl = page.find("div", id="imgholder").find("img", id="img")["src"].encode("us-ascii")
         return self.ciurl
 
@@ -45,7 +46,7 @@ class chapter(lib.pagelist):
 
     def pages(self):
         if self.cpag is None:
-            pg = soup(htcache.fetch(self.url))
+            pg = soupify(htcache.fetch(self.url))
             pag = []
             for opt in pg.find("div", id="selectpage").find("select", id="pageMenu").findAll("option"):
                 url = urlparse.urljoin(self.url, opt["value"].encode("us-ascii"))
@@ -77,7 +78,7 @@ class manga(lib.manga):
 
     def ch(self):
         if self.cch is None:
-            page = soup(htcache.fetch(self.url))
+            page = soupify(htcache.fetch(self.url))
             cls = page.find("div", id="chapterlist").find("table", id="listing")
             i = 0
             cch = []
@@ -108,14 +109,14 @@ class library(lib.library):
 
     def byid(self, id):
         url = self.base + id
-        page = soup(htcache.fetch(url))
+        page = soupify(htcache.fetch(url))
         if page.find("h2", attrs={"class": "aname"}) is None:
             raise KeyError(id)
         name = page.find("h2", attrs={"class": "aname"}).string
         return manga(self, id, name, url)
 
     def __iter__(self):
-        page = soup(htcache.fetch(self.base + "alphabetical"))
+        page = soupify(htcache.fetch(self.base + "alphabetical"))
         for sec in page.findAll("div", attrs={"class": "series_alpha"}):
             for li in sec.find("ul", attrs={"class": "series_alpha"}).findAll("li"):
                 url = li.a["href"].encode("us-ascii")
