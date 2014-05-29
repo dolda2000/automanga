@@ -110,7 +110,7 @@ def main():
         try:
             libname, mid = profile.getalias(alias)
         except KeyError:
-            sys.stderr("automanga: no such alias: %s\n" % alias)
+            sys.stderr.write("automanga: no such alias: %s\n" % alias)
             sys.exit(1)
         try:
             lib = manga.lib.findlib(libname)
