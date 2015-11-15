@@ -77,6 +77,7 @@ class imgload(future):
 
     def value(self):
         buf = gdkpix.PixbufLoader()
+        done = False
         try:
             with self.page.open() as st:
                 self.p = 0
@@ -89,8 +90,13 @@ class imgload(future):
                     buf.write(read)
                     self.progcb()
             self.st = None
+            done = True
         finally:
-            buf.close()
+            try:
+                buf.close()
+            except:
+                if done:
+                    raise
         return buf.get_pixbuf()
 
     @property
