@@ -1,4 +1,5 @@
-import threading, gtk, gobject
+import threading
+from gi.repository import Gtk as gtk, GdkPixbuf as gdkpix, Gdk as gdk, GObject as gobject
 import lib, profile
 
 class notdone(Exception): pass
@@ -75,7 +76,7 @@ class imgload(future):
         self.start()
 
     def value(self):
-        buf = gtk.gdk.PixbufLoader()
+        buf = gdkpix.PixbufLoader()
         try:
             with self.page.open() as st:
                 self.p = 0
@@ -174,43 +175,46 @@ class pageview(gtk.Widget):
         self.zoomed = None, None
         self.fit = True
         self.zoom = 1.0
-        self.interp = gtk.gdk.INTERP_HYPER
+        self.interp = gdkpix.InterpType.HYPER
         self.off = 0, 0
 
     def get_osize(self):
         return self.pixbuf.get_width(), self.pixbuf.get_height()
 
     def get_asize(self):
-        return self.allocation.width, self.allocation.height
+        alloc = self.get_allocation()
+        return alloc.width, alloc.height
 
     def do_realize(self):
-        self.set_flags(self.flags() | gtk.REALIZED)
-        alloc = self.allocation
-        self.window = gtk.gdk.Window(self.get_parent_window(),
-                                     width=alloc.width, height=alloc.height,
-                                     window_type = gtk.gdk.WINDOW_CHILD,
-                                     wclass = gtk.gdk.INPUT_OUTPUT,
-                                     event_mask = self.get_events() | gtk.gdk.EXPOSURE_MASK
-                                     )
-        self.window.set_user_data(self)
-        self.style.attach(self.window)
-        self.style.set_background(self.window, gtk.STATE_NORMAL)
-        self.window.move_resize(*alloc)
+        alloc = self.get_allocation()
+        attr = gdk.WindowAttr()
+        attr.window_type = gdk.WindowType.CHILD
+        attr.x = alloc.x
+        attr.y = alloc.y
+        attr.width = alloc.width
+        attr.height = alloc.height
+        attr.visual = self.get_visual()
+        attr.event_mask = self.get_events() | gdk.EventMask.EXPOSURE_MASK
+        a = gdk.WindowAttributesType
+        wnd = gdk.Window(self.get_parent_window(), attr, a.X | a.Y | a.VISUAL)
+        wnd.set_background_pattern(None)
+        self.set_window(wnd)
+        self.register_window(wnd)
+        self.set_realized(True)
 
-    def do_unrealize(self):
-        self.window.set_user_data(None)
-
-    def do_size_request(self, req):
-        w, h = self.get_osize()
-        req.width, req.height = max(min(w, 4096), 0), max(min(h, 4096), 0)
+    # XXX: Why don't these actually get called?
+    def get_preferred_width(self):
+        return 0, max(min(self.get_osize()[0], 4096), 0)
+    def get_preferred_height(self):
+        return 0, max(min(self.get_osize()[1], 4096), 0)
 
     def fitzoom(self):
         w, h = self.get_osize()
-        alloc = self.allocation
+        alloc = self.get_allocation()
         return min(float(alloc.width) / float(w), float(alloc.height) / float(h))
 
     def do_size_allocate(self, alloc):
-        self.allocation = alloc
+        self.set_allocation(alloc)
         if self.fit:
             self.zoom = self.fitzoom()
         else:
@@ -222,8 +226,8 @@ class pageview(gtk.Widget):
             if zh >= ah and oy + ah > zh:
                 oy = zh - ah
             self.off = ox, oy
-        if self.flags() & gtk.REALIZED:
-            self.window.move_resize(*alloc)
+        if self.get_realized():
+            self.get_window().move_resize(alloc.x, alloc.y, alloc.width, alloc.height)
 
     def get_zoomed(self):
         zoom = self.zoom
@@ -238,7 +242,7 @@ class pageview(gtk.Widget):
         zbuf = self.get_zoomed()
         return zbuf.get_width(), zbuf.get_height()
 
-    def do_expose_event(self, event):
+    def do_draw(self, cr):
         aw, ah = self.get_asize()
         dw, dh = aw, ah
         zbuf = self.get_zoomed()
@@ -251,8 +255,8 @@ class pageview(gtk.Widget):
         if zh < ah:
             dy = (ah - zh) / 2
             dh = zh
-        gc = self.style.fg_gc[gtk.STATE_NORMAL]
-        self.window.draw_pixbuf(gc, zbuf, ox, oy, dx, dy, dw, dh)
+        gdk.cairo_set_source_pixbuf(cr, zbuf, dx - ox, dy - oy)
+        cr.paint()
 
     def set_off(self, off):
         aw, ah = self.get_asize()
@@ -287,19 +291,18 @@ class pageview(gtk.Widget):
         ox = int(xa * dw) if dw > 0 else 0
         oy = int(ya * dh) if dh > 0 else 0
         self.set_off((ox, oy))
-gobject.type_register(pageview)
 
 class msgproc(object):
     def attach(self, reader):
         self.rd = reader
-        self.msg = gtk.Alignment(0, 0.5, 0, 0)
+        self.msg = gtk.Alignment(yalign=0.5)
         self.hlay = gtk.HBox()
         self.lbl = gtk.Label("")
-        self.hlay.pack_start(self.lbl)
+        self.hlay.pack_start(self.lbl, True, True, 0)
         self.lbl.show()
         self.msg.add(self.hlay)
         self.hlay.show()
-        self.rd.sbar.pack_start(self.msg)
+        self.rd.sbar.pack_start(self.msg, True, True, 0)
         self.msg.show()
         self._prog = None
 
@@ -307,7 +310,7 @@ class msgproc(object):
         if p is not None:
             if self._prog is None:
                 self._prog = gtk.ProgressBar()
-                self.hlay.pack_start(self._prog, padding=5)
+                self.hlay.pack_start(self._prog, True, True, 5)
                 self._prog.show()
             self._prog.set_fraction(p)
         elif p is None and self._prog is not None:
@@ -489,7 +492,7 @@ class profprop(object):
 
 class reader(gtk.Window):
     def __init__(self, manga, prof=None):
-        super(reader, self).__init__(gtk.WINDOW_TOPLEVEL)
+        super(reader, self).__init__()
         self.connect("delete_event",    lambda wdg, ev, data=None: False)
         self.connect("destroy",         lambda wdg, data=None:     self.quit())
         self.connect("key_press_event", self.key)
@@ -505,27 +508,27 @@ class reader(gtk.Window):
         self.point = None
 
         vlay = gtk.VBox()
-        self.pfr = gtk.Frame(None)
-        self.pfr.set_shadow_type(gtk.SHADOW_NONE)
-        vlay.pack_start(self.pfr)
+        self.pfr = gtk.Frame()
+        self.pfr.set_shadow_type(gtk.ShadowType.NONE)
+        vlay.pack_start(self.pfr, True, True, 0)
         self.pfr.show()
         self.sboxbar = gtk.HBox()
-        algn = gtk.Alignment(0, 0.5, 0, 0)
+        algn = gtk.Alignment(yalign=0.5)
         sboxlbl = gtk.Label(self.manga.name + u": ")
         algn.add(sboxlbl)
         sboxlbl.show()
-        self.sboxbar.pack_start(algn, False)
+        self.sboxbar.pack_start(algn, False, True, 0)
         algn.show()
-        vlay.pack_start(self.sboxbar, False)
+        vlay.pack_start(self.sboxbar, False, True, 0)
         self.sboxbar.show()
         self.sbar = gtk.HBox()
         self.pagelbl = gtk.Label("")
-        algn = gtk.Alignment(0, 0.5, 0, 0)
+        algn = gtk.Alignment(yalign=0.5)
         algn.add(self.pagelbl)
         self.pagelbl.show()
-        self.sbar.pack_start(algn)
+        self.sbar.pack_start(algn, True, True, 0)
         algn.show()
-        vlay.pack_end(self.sbar, False)
+        vlay.pack_end(self.sbar, False, True, 0)
         self.sbar.show()
         self.add(vlay)
         vlay.show()
@@ -558,7 +561,7 @@ class reader(gtk.Window):
         self.sboxes = self.sboxes[:l]
         for i in xrange(l, len(nodes)):
             new = sbox(self, nodes[i])
-            self.sboxbar.pack_start(new, False, padding=5)
+            self.sboxbar.pack_start(new, False, True, 5)
             self.sboxes.append(new)
             new.show()
 

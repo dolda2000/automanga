@@ -2,10 +2,10 @@
 
 import sys, getopt
 import manga.lib, manga.reader, manga.profile, manga.local
-import glib, gobject, gtk
+from gi.repository import Gtk, Gdk, GObject
 
-gobject.threads_init()
-gtk.gdk.threads_init()
+GObject.threads_init()
+Gdk.threads_init()
 
 def usage(out):
     out.write("usage: automanga [-h] [-p PROFILE] {DIRECTORY|-l LIBRARY ID|-a ALIAS}\n")
@@ -162,7 +162,7 @@ def main():
 
     reader = manga.reader.reader(mng, mprof)
     reader.show()
-    gtk.main()
+    Gtk.main()
 
 try:
     main()
