@@ -301,7 +301,7 @@ class pageview(gtk.Widget):
 class msgproc(object):
     def attach(self, reader):
         self.rd = reader
-        self.msg = gtk.Alignment(yalign=0.5)
+        self.msg = gtk.Alignment(xalign=0.0, yalign=0.5, xscale=0.0, yscale=0.0)
         self.hlay = gtk.HBox()
         self.lbl = gtk.Label("")
         self.hlay.pack_start(self.lbl, True, True, 0)
@@ -519,7 +519,7 @@ class reader(gtk.Window):
         vlay.pack_start(self.pfr, True, True, 0)
         self.pfr.show()
         self.sboxbar = gtk.HBox()
-        algn = gtk.Alignment(yalign=0.5)
+        algn = gtk.Alignment(xalign=0.0, yalign=0.5, xscale=0.0, yscale=0.0)
         sboxlbl = gtk.Label(self.manga.name + u": ")
         algn.add(sboxlbl)
         sboxlbl.show()
@@ -529,7 +529,7 @@ class reader(gtk.Window):
         self.sboxbar.show()
         self.sbar = gtk.HBox()
         self.pagelbl = gtk.Label("")
-        algn = gtk.Alignment(yalign=0.5)
+        algn = gtk.Alignment(xalign=0.0, yalign=0.5, xscale=0.0, yscale=0.0)
         algn.add(self.pagelbl)
         self.pagelbl.show()
         self.sbar.pack_start(algn, True, True, 0)
