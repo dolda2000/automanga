@@ -1,8 +1,8 @@
-import urllib, re
-import BeautifulSoup, json
-import lib, htcache
-soup = BeautifulSoup.BeautifulSoup
-soupify = lambda cont: soup(cont, convertEntities=soup.HTML_ENTITIES)
+import urllib.request, re
+import bs4, json
+from . import lib, htcache
+soup = bs4.BeautifulSoup
+soupify = lambda cont: soup(cont)
 
 class page(lib.page):
     def __init__(self, chapter, stack, n, url):
@@ -12,7 +12,7 @@ class page(lib.page):
         self.manga = self.volume.manga
         self.n = n
         self.id = str(n)
-        self.name = u"Page %s" % n
+        self.name = "Page %s" % n
         self.url = url
         self.ciurl = None
 
@@ -54,9 +54,9 @@ class chapter(lib.pagelist):
             if len(l.contents) != 3:
                 raise Exception("parse error: weird page list for %r" % self)
             m = l.contents[2].strip()
-            if m[:3] != u"of ":
+            if m[:3] != "of ":
                 raise Exception("parse error: weird page list for %r" % self)
-            self.cpag = [page(self, self.stack + [(self, n)], n + 1, self.url + ("%i.html" % (n + 1))) for n in xrange(int(m[3:]))]
+            self.cpag = [page(self, self.stack + [(self, n)], n + 1, self.url + ("%i.html" % (n + 1))) for n in range(int(m[3:]))]
         return self.cpag
 
     def __str__(self):
@@ -88,7 +88,7 @@ class volume(lib.pagelist):
 def nextel(el):
     while True:
         el = el.nextSibling
-        if isinstance(el, BeautifulSoup.Tag):
+        if isinstance(el, bs4.Tag):
             return el
 
 class manga(lib.manga):
@@ -115,29 +115,27 @@ class manga(lib.manga):
             cvol = []
             for i, vn in enumerate(reversed(vls)):
                 name = vn.find("h3", attrs={"class": "volume"}).contents[0].strip()
-                vid = name.encode("utf8")
-                vol = volume(self, [(self, i)], vid, name)
+                vol = volume(self, [(self, i)], name, name)
                 cls = nextel(vn)
-                if cls.name != u"ul" or cls["class"] != u"chlist":
+                if cls.name != "ul" or "chlist" not in cls["class"]:
                     raise Exception("parse error: weird volume list for %r" % self)
                 for o, ch in enumerate(reversed(cls.findAll("li"))):
                     n = ch.div.h3 or ch.div.h4
                     name = n.a.string
-                    chid = name.encode("utf8")
                     for span in ch("span"):
                         try:
-                            if u" title " in (u" " + span["class"] + u" "):
+                            if "title" in span["class"]:
                                 name += " " + span.string
                         except KeyError:
                             pass
-                    url = n.a["href"].encode("us-ascii")
+                    url = n.a["href"]
                     if url[-7:] == "/1.html":
                         url = url[:-6]
                     elif self.cure.search(url) is not None:
                         pass
                     else:
                         raise Exception("parse error: unexpected chapter URL for %r: %s" % (self, url))
-                    vol.ch.append(chapter(vol, vol.stack + [(vol, o)], chid, name, url))
+                    vol.ch.append(chapter(vol, vol.stack + [(vol, o)], name, name, url))
                 cvol.append(vol)
             self.cvol = cvol
         return self.cvol
@@ -163,7 +161,7 @@ class library(lib.library):
         for m in ls:
             t = m.find("div", attrs={"class": "manga_text"}).find("a", attrs={"class": "title"})
             name = t.string
-            url = t["href"].encode("us-ascii")
+            url = t["href"]
             if url[:len(ubase)] != ubase or url.find('/', len(ubase)) != (len(url) - 1):
                 raise Exception("parse error: unexpected manga URL for %r: %s" % (name, url))
             ret.append(manga(self, url[len(ubase):-1], name, url))
@@ -175,8 +173,6 @@ class library(lib.library):
         return int(ls[-2].find("a").string)
 
     def byname(self, prefix):
-        if not isinstance(prefix, unicode):
-            prefix = prefix.decode("utf8")
         l = 1
         r = self.alphapages()
         while True:
@@ -209,12 +205,9 @@ class library(lib.library):
             i = 0
 
     def search(self, expr):
-        resp = urllib.urlopen(self.base + ("ajax/search.php?term=%s" % urllib.quote(expr)))
-        try:
+        with urllib.request.urlopen(self.base + ("ajax/search.php?term=%s" % urllib.quote(expr))) as resp:
             rc = json.load(resp)
-        finally:
-            resp.close()
-        return [manga(self, id.encode("utf8"), name, self.base + ("manga/%s/" % id.encode("utf8"))) for num, name, id, genres, author in rc]
+        return [manga(self, id, name, self.base + ("manga/%s/" % id)) for num, name, id, genres, author in rc]
 
     def byid(self, id):
         url = self.base + ("manga/%s/" % id)
