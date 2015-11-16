@@ -1,7 +1,8 @@
-import BeautifulSoup, urlparse
-import lib, htcache
-soup = BeautifulSoup.BeautifulSoup
-soupify = lambda cont: soup(cont, convertEntities=soup.HTML_ENTITIES)
+import bs4
+from urllib.parse import urljoin
+from . import lib, htcache
+soup = bs4.BeautifulSoup
+soupify = lambda cont: soup(cont)
 
 class page(lib.page):
     def __init__(self, chapter, stack, n, url):
@@ -10,14 +11,14 @@ class page(lib.page):
         self.manga = chapter.manga
         self.n = n
         self.id = str(n)
-        self.name = u"Page %s" % n
+        self.name = "Page %s" % n
         self.url = url
         self.ciurl = None
 
     def iurl(self):
         if self.ciurl is None:
             page = soupify(htcache.fetch(self.url))
-            self.ciurl = page.find("div", id="imgholder").find("img", id="img")["src"].encode("us-ascii")
+            self.ciurl = page.find("div", id="imgholder").find("img", id="img")["src"]
         return self.ciurl
 
     def open(self):
@@ -49,7 +50,7 @@ class chapter(lib.pagelist):
             pg = soupify(htcache.fetch(self.url))
             pag = []
             for opt in pg.find("div", id="selectpage").find("select", id="pageMenu").findAll("option"):
-                url = urlparse.urljoin(self.url, opt["value"].encode("us-ascii"))
+                url = urljoin(self.url, opt["value"])
                 n = int(opt.string)
                 pag.append(page(self, self.stack + [(self, len(pag))], n, url))
             self.cpag = pag
@@ -86,13 +87,12 @@ class manga(lib.manga):
                 td = tr.find("td")
                 if td is None: continue
                 cla = td.find("a")
-                url = urlparse.urljoin(self.url, cla["href"].encode("us-ascii"))
-                name = cla.string
-                cid = name.encode("utf8")
-                if isinstance(cla.nextSibling, unicode):
-                    ncont = unicode(cla.nextSibling)
-                    if len(ncont) > 3 and ncont[:3] == u" : ":
-                        name += u": " + ncont[3:]
+                url = urljoin(self.url, cla["href"])
+                cid = name = cla.string
+                if isinstance(cla.nextSibling, str):
+                    ncont = str(cla.nextSibling)
+                    if len(ncont) > 3 and ncont[:3] == " : ":
+                        name += ": " + ncont[3:]
                 cch.append(chapter(self, [(self, len(cch))], cid, name, url))
             self.cch = cch
         return self.cch
@@ -119,7 +119,7 @@ class library(lib.library):
         page = soupify(htcache.fetch(self.base + "alphabetical"))
         for sec in page.findAll("div", attrs={"class": "series_alpha"}):
             for li in sec.find("ul", attrs={"class": "series_alpha"}).findAll("li"):
-                url = li.a["href"].encode("us-ascii")
+                url = li.a["href"]
                 name = li.a.string
                 if url[:1] != "/": continue
                 id = url[1:]
@@ -129,19 +129,15 @@ class library(lib.library):
                     if id[-5:] != ".html":
                         continue
                     id = id[:-5]
-                yield manga(self, id, name, urlparse.urljoin(self.base, url))
+                yield manga(self, id, name, urljoin(self.base, url))
 
     def byname(self, prefix):
-        if not isinstance(prefix, unicode):
-            prefix = prefix.decode("utf8")
         prefix = prefix.lower()
         for manga in self:
             if manga.name.lower()[:len(prefix)] == prefix:
                 yield manga
 
     def search(self, expr):
-        if not isinstance(expr, unicode):
-            expr = expr.decode("utf8")
         expr = expr.lower()
         for manga in self:
             if expr in manga.name.lower():
