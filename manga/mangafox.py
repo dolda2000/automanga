@@ -147,7 +147,11 @@ class manga(lib.manga):
         return "<mangafox.manga %r>" % self.name
 
 def libalphacmp(a, b):
-    return cmp(a.upper(), b.upper())
+    if a.upper() < b.upper():
+        return -1
+    elif a.upper() > b.upper():
+        return 1
+    return 0
 
 class library(lib.library):
     def __init__(self):
@@ -205,8 +209,10 @@ class library(lib.library):
             i = 0
 
     def search(self, expr):
-        with urllib.request.urlopen(self.base + ("ajax/search.php?term=%s" % urllib.quote(expr))) as resp:
-            rc = json.load(resp)
+        req = urllib.request.Request(self.base + ("ajax/search.php?term=%s" % urllib.parse.quote(expr)),
+                                     headers={"User-Agent": "automanga/1"})
+        with urllib.request.urlopen(req) as resp:
+            rc = json.loads(resp.read().decode("utf-8"))
         return [manga(self, id, name, self.base + ("manga/%s/" % id)) for num, name, id, genres, author in rc]
 
     def byid(self, id):
