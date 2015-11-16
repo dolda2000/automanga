@@ -11,7 +11,8 @@ class cache(object):
         return n.hexdigest()
 
     def miss(self, url):
-        with urllib.request.urlopen(url) as s:
+        req = urllib.request.Request(url, headers={"User-Agent": "automanga/1"})
+        with urllib.request.urlopen(req) as s:
             if s.headers.get("content-encoding") == "gzip":
                 import gzip, io
                 return gzip.GzipFile(fileobj=io.BytesIO(s.read()), mode="r").read()
