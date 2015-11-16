@@ -6,18 +6,24 @@ if home is None or not os.path.isdir(home):
     raise Exception("Could not find home directory for profile keeping")
 basedir = pj(home, ".manga", "profiles")
 
-class txfile(file):
+class txfile(object):
     def __init__(self, name, mode):
         self.realname = name
         self.tempname = name + ".new"
-        super(txfile, self).__init__(self.tempname, mode)
+        self.bk = open(self.tempname, mode)
 
     def close(self, abort=False):
-        super(txfile, self).close()
+        self.bk.close()
         if abort:
             os.unlink(self.tempname)
         else:
             os.rename(self.tempname, self.realname)
+
+    def read(self, sz=-1):
+        return self.bk.read(sz)
+
+    def write(self, data):
+        return self.bk.write(data)
 
     def __enter__(self):
         return self
@@ -29,7 +35,7 @@ class txfile(file):
             self.close(False)
 
 def openwdir(nm, mode="r"):
-    ft = file
+    ft = open
     if mode == "W":
         mode = "w"
         ft = txfile
@@ -119,7 +125,7 @@ class manga(object):
         self.props = self.loadprops()
 
     def open(self):
-        import lib
+        from . import lib
         return lib.findlib(self.libnm).byid(self.id)
 
     def save(self):
@@ -173,7 +179,7 @@ class tagview(object):
     @staticmethod
     def save(profile, m):
         with profile.file("tags", "W") as fp:
-            for (libnm, id), tags in m.iteritems():
+            for (libnm, id), tags in m.items():
                 fp.write(consline(libnm, id, *tags) + "\n")
 
     @staticmethod
@@ -206,7 +212,7 @@ class filemanga(manga):
 
     def save(self):
         with openwdir(self.path, "W") as f:
-            for key, val in self.props.iteritems():
+            for key, val in self.props.items():
                 if isinstance(val, str):
                     f.write(consline("set", key, val) + "\n")
                 else:
@@ -238,7 +244,7 @@ class profile(object):
     def savemapping(self, seq, m):
         with openwdir(pj(self.dir, "map"), "W") as f:
             f.write(consline("seq", str(seq)) + "\n")
-            for (libnm, id), num in m.iteritems():
+            for (libnm, id), num in m.items():
                 f.write(consline("manga", libnm, id, str(num)) + "\n")
 
     def getmanga(self, libnm, id, creat=False):
@@ -278,7 +284,7 @@ class profile(object):
 
     def savealiases(self, map):
         with openwdir(pj(self.dir, "alias"), "W") as f:
-            for nm, (libnm, id) in map.iteritems():
+            for nm, (libnm, id) in map.items():
                 f.write(consline("alias", nm, libnm, id) + "\n")
 
     def file(self, name, mode="r"):

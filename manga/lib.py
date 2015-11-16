@@ -149,7 +149,7 @@ class imgstream(object):
         """Close this stream."""
         raise NotImplementedError()
 
-    def read(self, sz = None):
+    def read(self, sz=None):
         """Read SZ bytes from the stream, or the entire rest of the
         stream of SZ is not given."""
         raise NotImplementedError()
@@ -159,8 +159,8 @@ class stdimgstream(imgstream):
     have no particular implementation requirements."""
 
     def __init__(self, url):
-        import urllib
-        self.bk = urllib.urlopen(url)
+        import urllib.request
+        self.bk = urllib.request.urlopen(url)
         ok = False
         try:
             if self.bk.getcode() != 200:
@@ -178,7 +178,7 @@ class stdimgstream(imgstream):
     def close(self):
         self.bk.close()
 
-    def read(self, sz = None):
+    def read(self, sz=None):
         if sz is None:
             return self.bk.read()
         else:
@@ -218,7 +218,8 @@ class cursor(object):
 loaded = {}
 def findlib(name):
     def load(name):
-        mod = __import__(name, fromlist=["dummy"])
+        import importlib
+        mod = importlib.import_module(name)
         if not hasattr(mod, "library"):
             raise ImportError("module " + name + " is not a manga library")
         return mod.library()

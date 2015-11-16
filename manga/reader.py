@@ -1,6 +1,6 @@
 import threading
 from gi.repository import Gtk as gtk, GdkPixbuf as gdkpix, Gdk as gdk, GObject as gobject
-import lib, profile
+from . import lib, profile
 
 class notdone(Exception): pass
 
@@ -12,13 +12,13 @@ class future(threading.Thread):
         self._val = None
         self._exc = None
         self._notlist = []
-        self._started = False
+        self._tstarted = False
         self.setDaemon(True)
 
     def start(self):
-        if not self._started:
+        if not self._tstarted:
             super(future, self).start()
-            self._started = True
+            self._tstarted = True
 
     def run(self):
         try:
@@ -84,7 +84,7 @@ class imgload(future):
                 self.st = st
                 while True:
                     read = st.read(1024)
-                    if read == "":
+                    if read == b"":
                         break
                     self.p += len(read)
                     buf.write(read)
@@ -520,7 +520,7 @@ class reader(gtk.Window):
         self.pfr.show()
         self.sboxbar = gtk.HBox()
         algn = gtk.Alignment(xalign=0.0, yalign=0.5, xscale=0.0, yscale=0.0)
-        sboxlbl = gtk.Label(self.manga.name + u": ")
+        sboxlbl = gtk.Label(self.manga.name + ": ")
         algn.add(sboxlbl)
         sboxlbl.show()
         self.sboxbar.pack_start(algn, False, True, 0)
@@ -553,7 +553,7 @@ class reader(gtk.Window):
             self.pagelbl.set_text("")
         else:
             w, h = self.page.get_osize()
-            self.pagelbl.set_text(u"%s\u00d7%s (%d%%)" % (w, h, int(self.page.zoom * 100)))
+            self.pagelbl.set_text("%s\u00d7%s (%d%%)" % (w, h, int(self.page.zoom * 100)))
 
     def updsboxes(self, page):
         nodes = [node for node, idx in page.stack[1:]] + [page]
@@ -562,10 +562,10 @@ class reader(gtk.Window):
             if pbox.node != node:
                 l = i
                 break
-        for i in xrange(l, len(self.sboxes)):
+        for i in range(l, len(self.sboxes)):
             self.sboxbar.remove(self.sboxes[i])
         self.sboxes = self.sboxes[:l]
-        for i in xrange(l, len(nodes)):
+        for i in range(l, len(nodes)):
             new = sbox(self, nodes[i])
             self.sboxbar.pack_start(new, False, True, 5)
             self.sboxes.append(new)
@@ -602,7 +602,7 @@ class reader(gtk.Window):
         return proc
 
     def updtitle(self):
-        self.set_title(u"Automanga \u2013 " + self.manga.name)
+        self.set_title("Automanga \u2013 " + self.manga.name)
 
     @property
     def zoom(self):

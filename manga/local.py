@@ -1,5 +1,5 @@
 import os
-import lib
+from . import lib
 pj = os.path.join
 
 def decode1(nm):
@@ -95,9 +95,9 @@ class manga(lib.manga):
         self.stack = []
         if os.path.exists(pj(self.path, "name")):
             with open(pj(self.path, "name")) as s:
-                self.name = s.readline().strip().decode("utf-8")
+                self.name = s.readline().strip()
         else:
-            self.name = os.path.basename(path).decode("utf-8")
+            self.name = os.path.basename(path)
         self.direct = self.destruct()
 
     def __len__(self):
