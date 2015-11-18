@@ -1,7 +1,8 @@
-import BeautifulSoup, urlparse
-import lib, htcache
-soup = BeautifulSoup.BeautifulSoup
-soupify = lambda cont: soup(cont, convertEntities=soup.HTML_ENTITIES)
+import bs4
+from . import lib, htcache
+from urllib.parse import urljoin
+soup = bs4.BeautifulSoup
+soupify = lambda cont: soup(cont)
 
 class page(lib.page):
     def __init__(self, chapter, stack, n, url):
@@ -10,7 +11,7 @@ class page(lib.page):
         self.manga = chapter.manga
         self.n = n
         self.id = str(n)
-        self.name = u"Page " + unicode(n)
+        self.name = "Page " + unicode(n)
         self.url = url
         self.ciurl = None
 
@@ -20,7 +21,7 @@ class page(lib.page):
             for tr in page.findAll("tr"):
                 img = tr.find("img", id="picture")
                 if img is not None:
-                    self.ciurl = urlparse.urljoin(self.url, img["src"].encode("us-ascii"))
+                    self.ciurl = urljoin(self.url, img["src"])
             if self.ciurl is None:
                 raise Exception("parse error: could not find image url for %r" % self)
         return self.ciurl
@@ -58,7 +59,7 @@ class chapter(lib.pagelist):
             pag = []
             for opt in pg.find("div", attrs={"class": "pager"}).find("select", attrs={"name": "page"}).findAll("option"):
                 n = int(opt["value"])
-                url = urlparse.urljoin(base, str(n))
+                url = urljoin(base, str(n))
                 pag.append(page(self, self.stack + [(self, len(pag))], n, url))
             self.cpag = pag
         return self.cpag
@@ -89,7 +90,7 @@ class manga(lib.manga):
             page = soupify(htcache.fetch(self.url))
             cls = None
             for div in page.findAll("div", attrs={"class": "post"}):
-                if div.h3 is not None and u"Chapter List" in div.h3.string:
+                if div.h3 is not None and "Chapter List" in div.h3.string:
                     cls = div
                     break
             if cls is None:
@@ -99,9 +100,9 @@ class manga(lib.manga):
                 lcol = tr.findAll("td")[1]
                 if lcol.a is None: continue
                 link = lcol.a
-                url = link["href"].encode("us-ascii")
+                url = link["href"]
                 name = link["title"]
-                cid = name.encode("utf-8")
+                cid = name
                 cch.append(chapter(self, [(self, len(cch))], cid, name, url))
             self.cch = cch
         return self.cch
@@ -117,15 +118,15 @@ class library(lib.library):
         self.base = "http://raw.senmanga.com/"
 
     def byid(self, id):
-        url = urlparse.urljoin(self.base, id + "/")
+        url = urljoin(self.base, id + "/")
         page = soupify(htcache.fetch(url))
         name = None
-        for div in page.findAll("div", attrs={"class": "post"}):
-            if div.h2 is not None and div.h2.a is not None:
-                curl = div.h2.a["href"].encode("us-ascii")
+        for div in page.findAll("div", id="post"):
+            if div.h1 is not None and div.h1.a is not None:
+                curl = div.h1.a["href"]
                 if curl[-1] != '/' or curl.rfind('/', 0, -1) < 0: continue
                 if curl[curl.rindex('/', 0, -1) + 1:-1] != id: continue
-                name = div.h2.a.string
+                name = div.h1.a.string
         if name is None:
             raise KeyError(id)
         return manga(self, id, name, url)
@@ -137,12 +138,12 @@ class library(lib.library):
                 link = row.findAll("td")[1].a
                 if link is None:
                     continue
-                url = link["href"].encode("us-ascii")
+                url = link["href"]
                 name = link.string
                 if len(url) < 3 or url[:1] != '/' or url[-1:] != '/':
                     continue
                 id = url[1:-1]
-                yield manga(self, id, name, urlparse.urljoin(self.base, url))
+                yield manga(self, id, name, urljoin(self.base, url))
 
     def byname(self, prefix):
         if not isinstance(prefix, unicode):
