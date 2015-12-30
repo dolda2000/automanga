@@ -4,7 +4,8 @@ pj = os.path.join
 home = os.getenv("HOME")
 if home is None or not os.path.isdir(home):
     raise Exception("Could not find home directory for profile keeping")
-basedir = pj(home, ".manga", "profiles")
+confdir = pj(home, ".manga")
+basedir = pj(confdir, "profiles")
 
 class txfile(object):
     def __init__(self, name, mode):
