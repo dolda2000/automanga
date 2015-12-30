@@ -121,7 +121,7 @@ class manga(lib.manga):
                     raise Exception("parse error: weird volume list for %r" % self)
                 for o, ch in enumerate(reversed(cls.findAll("li"))):
                     n = ch.div.h3 or ch.div.h4
-                    name = n.a.string
+                    chid = name = n.a.string
                     for span in ch("span"):
                         try:
                             if "title" in span["class"]:
@@ -135,7 +135,7 @@ class manga(lib.manga):
                         pass
                     else:
                         raise Exception("parse error: unexpected chapter URL for %r: %s" % (self, url))
-                    vol.ch.append(chapter(vol, vol.stack + [(vol, o)], name, name, url))
+                    vol.ch.append(chapter(vol, vol.stack + [(vol, o)], chid, name, url))
                 cvol.append(vol)
             self.cvol = cvol
         return self.cvol
