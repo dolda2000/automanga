@@ -161,7 +161,6 @@ class stdimgstream(imgstream):
     def __init__(self, url):
         import urllib.request
         req = urllib.request.Request(url, headers={"User-Agent": "automanga/1"})
-        print(req)
         self.bk = urllib.request.urlopen(req)
         ok = False
         try:
