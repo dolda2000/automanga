@@ -1,4 +1,5 @@
 import os, hashlib, urllib.request, time
+from . import profile
 pj = os.path.join
 
 class cache(object):
@@ -31,10 +32,7 @@ class cache(object):
             f.write(data)
         return data
 
-home = os.getenv("HOME")
-if home is None or not os.path.isdir(home):
-    raise Exception("Could not find home directory for HTTP caching")
-default = cache(pj(home, ".manga", "htcache"))
+default = cache(pj(profile.confdir, "htcache"))
 
 def fetch(url, expire=3600):
     return default.fetch(url, expire)
