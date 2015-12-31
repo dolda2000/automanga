@@ -157,7 +157,10 @@ class idpageget(future):
         self.idlist = idlist
 
     def value(self):
-        return lib.cursor(self.bnode.byidlist(self.idlist)).cur
+        try:
+            return lib.cursor(self.bnode.byidlist(self.idlist)).cur
+        except KeyError:
+            raise KeyError("could not find last read page: " + repr(self.idlist))
 
 class pageget(future):
     def __init__(self, fnode):
