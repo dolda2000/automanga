@@ -38,7 +38,9 @@ def nextel(el):
             return el
 
 def fetchreader(lib, readerid, page):
-    pg = soupify(lib.sess.fetch(lib.base + "areader?" + urllib.parse.urlencode({"id": readerid, "p": str(page)}),
+    pg = soupify(lib.sess.fetch(lib.base + "areader?" + urllib.parse.urlencode({"id": readerid,
+                                                                                "p": str(page),
+                                                                                "supress_webtoon": "t"}),
                                 headers={"Referer": "http://bato.to/reader"}))
     return pg
 
