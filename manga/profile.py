@@ -256,7 +256,7 @@ class profile(object):
             raise KeyError("no such manga: (%s, %s)" % (libnm, id))
         while True:
             try:
-                fp = openwdir(pj(self.dir, "%i.manga" % seq), "wx")
+                fp = openwdir(pj(self.dir, "%i.manga" % seq), "x")
             except IOError:
                 seq += 1
             else:
