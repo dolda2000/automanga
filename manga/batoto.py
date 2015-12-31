@@ -307,7 +307,7 @@ class library(lib.library):
         while True:
             _pars = dict(pars)
             _pars["p"] = str(p)
-            resp = urllib.request.urlopen(self.base + "search?" + urllib.parse.urlencode(_pars).encode("ascii"))
+            resp = urllib.request.urlopen(self.base + "search?" + urllib.parse.urlencode(_pars))
             try:
                 page = soupify(resp.read())
             finally:
