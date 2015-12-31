@@ -1,4 +1,4 @@
-import urllib.request, urllib.parse, http.cookiejar, re, bs4, os
+import urllib.request, urllib.parse, http.cookiejar, re, bs4, os, time
 from . import profile, lib, htcache
 soup = bs4.BeautifulSoup
 soupify = lambda cont: soup(cont, "html.parser")
@@ -7,6 +7,21 @@ class pageerror(Exception):
     def __init__(self, message, page):
         super().__init__(message)
         self.page = page
+
+def iterlast(itr, default=None):
+    if default is not None:
+        ret = default
+    try:
+        while True:
+            ret = next(itr)
+    except StopIteration:
+        return ret
+
+def find1(el, *args, **kwargs):
+    ret = el.find(*args, **kwargs)
+    if ret is None:
+        raise pageerror("could not find expected element", iterlast(el.parents, el))
+    return ret
 
 def byclass(el, name, cl):
     for ch in el.findAll(name):
@@ -22,20 +37,26 @@ def nextel(el):
         if isinstance(el, bs4.Tag):
             return el
 
+def fetchreader(lib, readerid, page):
+    pg = soupify(lib.sess.fetch(lib.base + "areader?" + urllib.parse.urlencode({"id": readerid, "p": str(page)}),
+                                headers={"Referer": "http://bato.to/reader"}))
+    return pg
+
 class page(lib.page):
-    def __init__(self, chapter, stack, n, url):
+    def __init__(self, chapter, stack, readerid, n):
         self.stack = stack
+        self.lib = chapter.lib
         self.chapter = chapter
         self.n = n
         self.id = str(n)
         self.name = "Page %s" % n
-        self.url = url
+        self.readerid = readerid
         self.ciurl = None
 
     def iurl(self):
         if self.ciurl is None:
-            page = soupify(htcache.fetch(self.url))
-            img = nextel(page.find("div", id="full_image")).img
+            page = fetchreader(self.lib, self.readerid, self.n)
+            img = find1(page, "img", id="comic_page")
             self.ciurl = img["src"]
         return self.ciurl
 
@@ -49,12 +70,13 @@ class page(lib.page):
         return "<batoto.page %r.%r.%r>" % (self.chapter.manga.name, self.chapter.name, self.name)
 
 class chapter(lib.pagelist):
-    def __init__(self, manga, stack, id, name, url):
+    def __init__(self, manga, stack, id, name, readerid):
         self.stack = stack
         self.manga = manga
+        self.lib = manga.lib
         self.id = id
         self.name = name
-        self.url = url
+        self.readerid = readerid
         self.cpag = None
 
     def __getitem__(self, i):
@@ -66,12 +88,11 @@ class chapter(lib.pagelist):
     pnre = re.compile(r"page (\d+)")
     def pages(self):
         if self.cpag is None:
-            pg = soupify(htcache.fetch(self.url))
+            pg = fetchreader(self.lib, self.readerid, 1)
             cpag = []
-            for opt in pg.find("select", id="page_select").findAll("option"):
-                url = opt["value"]
+            for opt in find1(pg, "select", id="page_select").findAll("option"):
                 n = int(self.pnre.match(opt.string).group(1))
-                cpag.append(page(self, self.stack + [(self, len(cpag))], n, url))
+                cpag.append(page(self, self.stack + [(self, len(cpag))], self.readerid, n))
             self.cpag = cpag
         return self.cpag
 
@@ -106,7 +127,7 @@ class manga(lib.manga):
             return False
         return True
 
-    cure = re.compile(r"/read/_/(\d+)/[^/]*")
+    cure = re.compile(r"/reader#([a-z0-9]+)")
     def ch(self):
         if self.cch is None:
             page = self.sess.lfetch(self.url, self.vfylogin)
@@ -122,14 +143,13 @@ class manga(lib.manga):
                         url = ch.td.a["href"]
                         m = self.cure.search(url)
                         if m is None: raise pageerror("Got weird chapter URL: %r" % url, page)
-                        cid = m.group(1)
-                        url = self.lib.base + "read/_/" + cid
+                        readerid = m.group(1)
                         name = ch.td.a.text
-                        cch.append((cid, name, url))
+                        cch.append((readerid, name))
             cch.reverse()
             rch = []
-            for n, (cid, name, url) in enumerate(cch):
-                rch.append(chapter(self, [(self, n)], cid, name, url))
+            for n, (readerid, name) in enumerate(cch):
+                rch.append(chapter(self, [(self, n)], readerid, name, readerid))
             self.cch = rch
         return self.cch
 
@@ -193,19 +213,23 @@ class session(object):
         self.creds = credentials
         self.jar = http.cookiejar.CookieJar()
         self.web = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.jar))
-        self.loggedin = False
+        self.lastlogin = 0
 
     rlre = re.compile(r"Welcome, (.*) ")
-    def dologin(self):
-        with self.web.open(self.base) as hs:
-            page = soupify(hs.read())
+    def dologin(self, pre=None):
+        now = time.time()
+        if now - self.lastlogin < 60:
+            raise Exception("Too soon since last login attempt")
+        if pre is None:
+            with self.web.open(self.base) as hs:
+                page = soupify(hs.read())
+        else:
+            page = pre
 
         cur = page.find("a", id="user_link")
-        print(0)
         if cur:
-            m = self.rlre.search(cur.get_text())
+            m = self.rlre.search(cur.text)
             if not m or m.group(1) != self.creds.username:
-                print(1)
                 outurl = None
                 nav = page.find("div", id="user_navigation")
                 if nav:
@@ -219,17 +243,18 @@ class session(object):
                 with self.web.open(self.base) as hs:
                     page = soupify(hs.read())
             else:
-                print(2)
                 return
         else:
-            print(3)
 
         form = page.find("form", id="login")
+        if not form and pre:
+            return self.dologin()
         values = {}
         for el in form.findAll("input", type="hidden"):
             values[el["name"]] = el["value"]
         values["ips_username"] = self.creds.username
         values["ips_password"] = self.creds.password
+        values["rememberMe"] = "1"
         values["anonymous"] = "1"
         req = urllib.request.Request(form["action"], urllib.parse.urlencode(values).encode("ascii"))
         with self.web.open(req) as hs:
@@ -239,24 +264,23 @@ class session(object):
                 break
         else:
             raise pageerror("Could not log in", page)
-
-    def login(self):
-        if not self.loggedin:
-            if self.creds:
-                self.dologin()
-            self.loggedin = True
+        self.lastlogin = now
 
     def open(self, url):
         return self.web.open(url)
 
-    def fetch(self, url):
-        with self.open(url) as hs:
+    def fetch(self, url, headers=None):
+        req = urllib.request.Request(url)
+        if headers is not None:
+            for k, v in headers.items():
+                req.add_header(k, v)
+        with self.open(req) as hs:
             return hs.read()
 
     def lfetch(self, url, ck):
         page = soupify(self.fetch(url))
         if not ck(page):
-            self.login()
+            self.dologin(pre=page)
             page = soupify(self.fetch(url))
             if not ck(page):
                 raise pageerror("Could not verify login status despite having logged in", page)
