@@ -67,13 +67,14 @@ class page(lib.page):
         return self.name
 
     def __repr(self):
-        return "<batoto.page %r.%r.%r>" % (self.chapter.manga.name, self.chapter.name, self.name)
+        return "<batoto.page %r.%r.%r.%r>" % (self.chapter.manga.name, self.chapter.group.name, self.chapter.name, self.name)
 
 class chapter(lib.pagelist):
-    def __init__(self, manga, stack, id, name, readerid):
+    def __init__(self, group, stack, id, name, readerid):
         self.stack = stack
-        self.manga = manga
-        self.lib = manga.lib
+        self.group = group
+        self.manga = group.manga
+        self.lib = self.manga.lib
         self.id = id
         self.name = name
         self.readerid = readerid
@@ -100,7 +101,27 @@ class chapter(lib.pagelist):
         return self.name
 
     def __repr__(self):
-        return "<batoto.chapter %r.%r>" % (self.manga.name, self.name)
+        return "<batoto.chapter %r.%r.%r>" % (self.manga.name, self.group.name, self.name)
+
+class group(lib.pagelist):
+    def __init__(self, manga, stack, id, name):
+        self.stack = stack
+        self.manga = manga
+        self.id = id
+        self.name = name
+        self.ch = []
+
+    def __getitem__(self, i):
+        return self.ch[i]
+
+    def __len__(self):
+        return len(self.ch)
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return "<batoto.group %r.%r" % (self.manga.name, self.name)
 
 class manga(lib.manga):
     def __init__(self, lib, id, name, url):
@@ -145,12 +166,20 @@ class manga(lib.manga):
                         if m is None: raise pageerror("Got weird chapter URL: %r" % url, page)
                         readerid = m.group(1)
                         name = ch.td.a.text
-                        cch.append((readerid, name))
+                        gname = nextel(nextel(ch.td)).text.strip()
+                        cch.append((readerid, name, gname))
             cch.reverse()
-            rch = []
-            for n, (readerid, name) in enumerate(cch):
-                rch.append(chapter(self, [(self, n)], readerid, name, readerid))
-            self.cch = rch
+            groups = {}
+            for n, (readerid, name, gname) in enumerate(cch):
+                groups.setdefault(gname, [n, []])[1].append((readerid, name))
+            groups = sorted(groups.items(), key=lambda o: o[1][0])
+            rgrp = []
+            for n, (gname, (_, gch)) in enumerate(groups):
+                ngrp = group(self, [(self, n)], gname, gname)
+                for m, (readerid, name) in enumerate(gch):
+                    ngrp.ch.append(chapter(ngrp, ngrp.stack + [(ngrp, m)], readerid, name, readerid))
+                rgrp.append(ngrp)
+            self.cch = rgrp
         return self.cch
 
     def altnames(self):
