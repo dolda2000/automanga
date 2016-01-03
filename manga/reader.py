@@ -1,4 +1,6 @@
 import threading
+import gi
+gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk as gtk, GdkPixbuf as gdkpix, Gdk as gdk, GObject as gobject
 from . import lib, profile
 
