@@ -2,7 +2,7 @@ import bs4
 from urllib.parse import urljoin
 from . import lib, htcache
 soup = bs4.BeautifulSoup
-soupify = lambda cont: soup(cont)
+soupify = lambda cont: soup(cont, "html.parser")
 
 class page(lib.page):
     def __init__(self, chapter, stack, n, url):
