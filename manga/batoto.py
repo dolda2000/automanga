@@ -288,6 +288,7 @@ class session(object):
         values["rememberMe"] = "1"
         values["anonymous"] = "1"
         req = urllib.request.Request(form["action"], urllib.parse.urlencode(values).encode("ascii"))
+        req.add_header("User-Agent", self.useragent)
         with self.web.open(req) as hs:
             page = soupify(hs.read())
         for resp in page.findAll("p", attrs={"class": "message"}):
@@ -300,8 +301,10 @@ class session(object):
     def open(self, url):
         return self.web.open(url)
 
+    useragent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.22 (KHTML, like Gecko) Chrome/25.0.1364.160 Safari/537.22"
     def fetch(self, url, headers=None):
         req = urllib.request.Request(url)
+        req.add_header("User-Agent", self.useragent)
         if headers is not None:
             for k, v in headers.items():
                 req.add_header(k, v)
@@ -338,7 +341,9 @@ class library(lib.library):
         while True:
             _pars = dict(pars)
             _pars["p"] = str(p)
-            resp = urllib.request.urlopen(self.base + "search?" + urllib.parse.urlencode(_pars))
+            req = urllib.request.Request(self.base + "search?" + urllib.parse.urlencode(_pars))
+            req.add_header("User-Agent", session.useragent)
+            resp = urllib.request.urlopen(req)
             try:
                 page = soupify(resp.read())
             finally:
