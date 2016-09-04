@@ -2,6 +2,9 @@ import os, hashlib, urllib.request, time
 from . import profile
 pj = os.path.join
 
+class notfound(Exception):
+    pass
+
 class cache(object):
     def __init__(self, dir):
         self.dir = dir
@@ -11,9 +14,18 @@ class cache(object):
         n.update(url.encode("ascii"))
         return n.hexdigest()
 
-    def miss(self, url):
+    def open(self, url):
         req = urllib.request.Request(url, headers={"User-Agent": "automanga/1"})
-        with urllib.request.urlopen(req) as s:
+        return urllib.request.urlopen(req)
+
+    def miss(self, url):
+        try:
+            s = self.open(url)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                raise notfound(url)
+            raise
+        with s:
             if s.headers.get("content-encoding") == "gzip":
                 import gzip, io
                 return gzip.GzipFile(fileobj=io.BytesIO(s.read()), mode="r").read()
