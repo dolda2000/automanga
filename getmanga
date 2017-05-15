@@ -37,33 +37,35 @@ def expand(pattern, page):
     ret = ""
     si = 0
     fp = 0
+    stack = list(zip([t for t, i in page.stack], [t for t, i in page.stack[1:]] + [page], [i for t, i in page.stack]))
     while True:
         p = pattern.find('%', fp)
         if p < 0:
-            if si < len(page.stack):
+            if si < len(stack):
                 sys.stderr.write("getmanga: pattern %s did not match page %s\n" %
-                                 (pattern, "/".join(t.name for t, i in page.stack)))
+                                 (pattern, "/".join(c.name for t, c, i in stack)))
                 sys.exit(1)
             return ret + pattern[fp:]
         ret += pattern[fp:p]
-        m = pattern[p:p + 1]
+        m = pattern[p + 1:p + 2]
+        fp = p + 2
         if m == "%":
             ret += "%"
         else:
-            if si >= len(page.stack):
+            if si >= len(stack):
                 sys.stderr.write("getmanga: pattern %s did not match page %s\n" %
-                                 (pattern, "/".join(t.name for t, i in page.stack)))
+                                 (pattern, "/".join(c.name for t, c, i in stack)))
                 sys.exit(1)
-            t, ti = page.stack[si]
+            t, ct, ti = stack[si]
             si += 1
             if m == "i":
                 ret += "%0*i" % (digits(len(t) + 1), ti + 1)
             elif m == "n":
-                ret += t.name
+                ret += ct.name
             elif m == "d":
-                ret += t.id
+                ret += ct.id
             else:
-                sys.stderr.write("getmanga: %s: unknown specified `%s'\n" % (m))
+                sys.stderr.write("getmanga: %s: unknown specifier `%s'\n" % (pattern, m))
                 sys.exit(1)
 
 def download(mng, tdir, pattern):
