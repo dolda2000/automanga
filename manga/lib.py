@@ -206,6 +206,9 @@ class cursor(object):
                 return self.cur
         raise StopIteration()
 
+    def __next__(self):
+        return self.next()
+
     def prev(self):
         for n, i in reversed(self.cur.stack):
             if i > 0:
