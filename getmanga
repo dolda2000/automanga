@@ -104,13 +104,14 @@ def download(mng, tdir, pattern):
         time.sleep(cwait)
 
 def usage(out):
-    out.write("usage: getmanga [-hv] [-w WAIT] [-p PROFILE] DIRECTORY [LIBRARY ID]\n")
+    out.write("usage: getmanga [-hv] [-w WAIT] [-p PROFILE] [-P PATTERN] DIRECTORY [LIBRARY ID]\n")
 
 def main():
     global verbose, wait, mprof, props
 
-    opts, args = getopt.getopt(sys.argv[1:], "hvp:w:")
+    opts, args = getopt.getopt(sys.argv[1:], "hvp:w:P:")
     profnm = ""
+    pattern = None
     for o, a in opts:
         if o == "-h":
             usage(sys.stdout)
@@ -121,6 +122,8 @@ def main():
             verbose += 1
         elif o == "-w":
             wait = int(a)
+        elif o == "-P":
+            pattern = a
     if len(args) < 1:
         usage(sys.stderr)
         sys.exit(1)
@@ -167,7 +170,7 @@ def main():
         sys.exit(1)
     mprof = profile.getmanga(libnm, mng.id)
 
-    download(mprof.open(), tdir, getprop("pattern"))
+    download(mprof.open(), tdir, pattern or getprop("pattern"))
 
 if __name__ == "__main__":
     try:
