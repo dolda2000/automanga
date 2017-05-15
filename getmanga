@@ -1,0 +1,174 @@
+#!/usr/bin/python3
+
+import sys, os, getopt, time, random
+import manga.lib, manga.profile
+from PIL import Image
+
+verbose = 0
+wait = 10
+
+def msg(vl, msg, *args):
+    if verbose >= vl:
+        sys.stderr.write("getmanga: " + (msg % args) + "\n")
+
+def getprop(nm, default=None):
+    if "dl-" + nm in mprof.props:
+        return mprof.props["dl-" + nm]
+    if nm in props:
+        return props[nm]
+    return default
+
+def digits(num):
+    n, i = 10, 1
+    while True:
+        if num < n:
+            return i
+        n, i = n * 10, i + 1
+
+def autoname(page):
+    ret = ""
+    for t, i in page.stack:
+        if ret:
+            ret += "-"
+        ret += "%0*i" % (digits(len(t) + 1), i + 1)
+    return ret
+
+def expand(pattern, page):
+    ret = ""
+    si = 0
+    fp = 0
+    while True:
+        p = pattern.find('%', fp)
+        if p < 0:
+            if si < len(page.stack):
+                sys.stderr.write("getmanga: pattern %s did not match page %s\n" %
+                                 (pattern, "/".join(t.name for t, i in page.stack)))
+                sys.exit(1)
+            return ret + pattern[fp:]
+        ret += pattern[fp:p]
+        m = pattern[p:p + 1]
+        if m == "%":
+            ret += "%"
+        else:
+            if si >= len(page.stack):
+                sys.stderr.write("getmanga: pattern %s did not match page %s\n" %
+                                 (pattern, "/".join(t.name for t, i in page.stack)))
+                sys.exit(1)
+            t, ti = page.stack[si]
+            si += 1
+            if m == "i":
+                ret += "%0*i" % (digits(len(t) + 1), ti + 1)
+            elif m == "n":
+                ret += t.name
+            elif m == "d":
+                ret += t.id
+            else:
+                sys.stderr.write("getmanga: %s: unknown specified `%s'\n" % (m))
+                sys.exit(1)
+
+def download(mng, tdir, pattern):
+    exts = ["", ".jpg", ".jpeg", ".png", ".gif"]
+    fmts = {"PNG": "png", "JPEG": "jpeg", "GIF": "gif"}
+    for page in manga.lib.cursor(mng):
+        if pattern is None:
+            nm = autoname(page)
+        else:
+            nm = expand(pattern, page)
+        path = os.path.join(tdir, nm)
+        if any(os.path.exists(path + ext) for ext in exts):
+            msg(2, "%s exists, skipping", nm)
+            continue
+        msg(1, "getting %s...", nm)
+        with page.open() as fp:
+            with open(path, "wb") as out:
+                while True:
+                    data = fp.read(65536)
+                    if data == b"":
+                        break
+                    out.write(data)
+            try:
+                img = Image.open(path)
+            except OSError:
+                fmt = None
+            else:
+                fmt = img.format
+            if fmt not in fmts:
+                sys.stderr.write("getmanga: warning: could not determine file format of %s, leaving as is\n" % nm)
+            else:
+                os.rename(path, path + "." + fmts[fmt])
+                msg(3, "%s -> %s", nm, nm + "." + fmts[fmt])
+        cwait = abs(random.gauss(0, 1) * wait)
+        msg(2, "waiting %.1f s...", cwait)
+        time.sleep(cwait)
+
+def usage(out):
+    out.write("usage: getmanga [-hv] [-w WAIT] [-p PROFILE] DIRECTORY [LIBRARY ID]\n")
+
+def main():
+    global verbose, wait, mprof, props
+
+    opts, args = getopt.getopt(sys.argv[1:], "hvp:w:")
+    profnm = ""
+    for o, a in opts:
+        if o == "-h":
+            usage(sys.stdout)
+            sys.exit(0)
+        elif o == "-p":
+            profnm = a
+        elif o == "-v":
+            verbose += 1
+        elif o == "-w":
+            wait = int(a)
+    if len(args) < 1:
+        usage(sys.stderr)
+        sys.exit(1)
+    tdir = args[0]
+
+    if not os.path.isdir(tdir):
+        sys.stderr.write("getmanga: %s: not a directory\n" % (tdir))
+        sys.exit(1)
+
+    pfile = os.path.join(tdir, ".props")
+    props = {}
+    if os.path.exists(pfile):
+        with open(pfile, "r") as fp:
+            for words in splitlines(f):
+                if words[0] == "set" and len(words) > 2:
+                    props[words[1]] = words[2]
+                elif words[0] == "lset" and len(words) > 1:
+                    props[words[1]] = words[2:]
+
+    if profnm == "":
+        profile = manga.profile.profile.last()
+    else:
+        profile = manga.profile.profile.byname(profnm)
+
+    if len(args) == 2:
+        usage(sys.stderr)
+        sys.exit(1)
+    elif len(args) > 2:
+        libnm, mid = args[1:3]
+    elif isinstance(props.get("manga"), list):
+        libnm, mid = props["manga"]
+    else:
+        sys.stderr.write("getmanga: %s: id is neither saved nor given\n" % (tdir))
+        sys.exit(1)
+    try:
+        lib = manga.lib.findlib(libnm)
+    except ImportError:
+        sys.stderr.write("getmanga: no such library: %s\n" % (libnm))
+        sys.exit(1)
+    try:
+        mng = lib.byid(mid)
+    except KeyError:
+        sys.stderr.write("getmanga: no such manga: %s\n" % (mid))
+        sys.exit(1)
+    mprof = profile.getmanga(libnm, mng.id)
+
+    download(mprof.open(), tdir, getprop("pattern"))
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
