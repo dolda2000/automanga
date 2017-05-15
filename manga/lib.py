@@ -206,9 +206,6 @@ class cursor(object):
                 return self.cur
         raise StopIteration()
 
-    def __next__(self):
-        return self.next()
-
     def prev(self):
         for n, i in reversed(self.cur.stack):
             if i > 0:
@@ -217,7 +214,14 @@ class cursor(object):
         raise StopIteration()
 
     def __iter__(self):
-        return self
+        def iterator():
+            yield self.cur
+            while True:
+                try:
+                    yield self.next()
+                except StopIteration:
+                    break
+        return iterator()
 
 loaded = {}
 def findlib(name):
