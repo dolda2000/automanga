@@ -132,7 +132,7 @@ def main():
     props = {}
     if os.path.exists(pfile):
         with open(pfile, "r") as fp:
-            for words in splitlines(f):
+            for words in manga.profile.splitlines(fp):
                 if words[0] == "set" and len(words) > 2:
                     props[words[1]] = words[2]
                 elif words[0] == "lset" and len(words) > 1:
