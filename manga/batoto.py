@@ -276,6 +276,7 @@ class session(object):
             else:
                 return
         else:
+            pass
 
         form = page.find("form", id="login")
         if not form and pre:
