@@ -6,4 +6,4 @@ setup(name = "automanga",
       version = "1",
       description = "Automanga",
       packages = ["manga"],
-      scripts = ["automanga"])
+      scripts = ["automanga", "getmanga"])
