@@ -12,7 +12,7 @@ def msg(vl, msg, *args):
         sys.stderr.write("getmanga: " + (msg % args) + "\n")
 
 def getprop(nm, default=None):
-    if "dl-" + nm in mprof.props:
+    if mprof and "dl-" + nm in mprof.props:
         return mprof.props["dl-" + nm]
     if nm in props:
         return props[nm]
@@ -110,7 +110,7 @@ def main():
     global verbose, wait, mprof, props
 
     opts, args = getopt.getopt(sys.argv[1:], "hvp:w:P:")
-    profnm = ""
+    profnm = None
     pattern = None
     for o, a in opts:
         if o == "-h":
@@ -143,8 +143,10 @@ def main():
                 elif words[0] == "lset" and len(words) > 1:
                     props[words[1]] = words[2:]
 
-    if profnm == "":
+    if profnm is None:
         profile = manga.profile.profile.last()
+    elif profnm == "":
+        profile = None
     else:
         profile = manga.profile.profile.byname(profnm)
 
@@ -168,9 +170,12 @@ def main():
     except KeyError:
         sys.stderr.write("getmanga: no such manga: %s\n" % (mid))
         sys.exit(1)
-    mprof = profile.getmanga(libnm, mng.id)
+    if profile is not None:
+        mprof = profile.getmanga(libnm, mng.id)
+    else:
+        mprof = None
 
-    download(mprof.open(), tdir, pattern or getprop("pattern"))
+    download(mng, tdir, pattern or getprop("pattern"))
 
 if __name__ == "__main__":
     try:
