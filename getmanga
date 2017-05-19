@@ -83,11 +83,17 @@ def download(mng, tdir, pattern):
         msg(1, "getting %s...", nm)
         with page.open() as fp:
             with open(path, "wb") as out:
-                while True:
-                    data = fp.read(65536)
-                    if data == b"":
-                        break
-                    out.write(data)
+                done = False
+                try:
+                    while True:
+                        data = fp.read(65536)
+                        if data == b"":
+                            done = True
+                            break
+                        out.write(data)
+                finally:
+                    if not done:
+                        os.unlink(path)
             try:
                 img = Image.open(path)
             except OSError:
