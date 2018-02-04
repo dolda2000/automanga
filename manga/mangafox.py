@@ -1,4 +1,4 @@
-import urllib.request, re
+import urllib.request, urllib.parse, re
 import bs4, json
 from . import lib, htcache
 soup = bs4.BeautifulSoup
@@ -128,7 +128,7 @@ class manga(lib.manga):
                                 name += " " + span.string
                         except KeyError:
                             pass
-                    url = n.a["href"]
+                    url = urllib.parse.urljoin(self.url, n.a["href"])
                     if url[-7:] == "/1.html":
                         url = url[:-6]
                     elif self.cure.search(url) is not None:
@@ -158,17 +158,18 @@ class library(lib.library):
         self.base = "http://mangafox.me/"
 
     def alphapage(self, pno):
-        page = soupify(htcache.fetch(self.base + ("directory/%i.htm?az" % pno)))
+        abase = self.base + ("directory/%i.htm?az" % pno)
+        page = soupify(htcache.fetch(abase))
         ls = page.find("div", id="mangalist").find("ul", attrs={"class": "list"}).findAll("li")
         ret = []
-        ubase = self.base + "manga/"
         for m in ls:
             t = m.find("div", attrs={"class": "manga_text"}).find("a", attrs={"class": "title"})
             name = t.string
-            url = t["href"]
-            if url[:len(ubase)] != ubase or url.find('/', len(ubase)) != (len(url) - 1):
+            url = urllib.parse.urljoin(abase, t["href"])
+            p = url.find("/manga/")
+            if p < 0 or url.find('/', p + 7) != (len(url) - 1):
                 raise Exception("parse error: unexpected manga URL for %r: %s" % (name, url))
-            ret.append(manga(self, url[len(ubase):-1], name, url))
+            ret.append(manga(self, url[p + 7:-1], name, url))
         return ret
 
     def alphapages(self):
