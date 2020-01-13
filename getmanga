@@ -111,6 +111,10 @@ def download(mng, tdir, pattern):
 
 def usage(out):
     out.write("usage: getmanga [-hv] [-w WAIT] [-p PROFILE] [-P PATTERN] DIRECTORY [LIBRARY ID]\n")
+    out.write("\tpattern templates:\n")
+    out.write("\t  %i\tSequence number\n")
+    out.write("\t  %n\tName\n")
+    out.write("\t  %d\tID\n")
 
 def main():
     global verbose, wait, mprof, props
