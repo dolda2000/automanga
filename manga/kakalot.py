@@ -1,4 +1,4 @@
-import bs4
+import bs4, json, urllib
 from urllib.parse import urljoin
 from . import lib, htcache
 soup = bs4.BeautifulSoup
@@ -108,3 +108,17 @@ class library(lib.library):
         if name is None: raise KeyError(id)
         name = name.string
         return manga(self, id, name, url)
+
+    def search(self, expr):
+        values = {"searchword": expr}
+        req = urllib.request.Request(self.base + "home_json_search",
+                                     urllib.parse.urlencode(values).encode("ascii"),
+                                     headers={"User-Agent": "automanga/1"})
+        with urllib.request.urlopen(req) as resp:
+            rc = json.loads(resp.read().decode("utf-8"))
+        for obj in rc:
+            if "nameunsigned" in obj:
+                try:
+                    yield self.byid(obj["nameunsigned"])
+                except KeyError:
+                    pass
