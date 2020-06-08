@@ -158,9 +158,12 @@ class stdimgstream(imgstream):
     """A standard implementation of imgstream, for libraries which
     have no particular implementation requirements."""
 
-    def __init__(self, url):
+    def __init__(self, url, referer=None):
         import urllib.request
-        req = urllib.request.Request(url, headers={"User-Agent": "automanga/1"})
+        headers = {"User-Agent": "automanga/1"}
+        if referer:
+            headers["Referer"] = referer
+        req = urllib.request.Request(url, headers=headers)
         self.bk = urllib.request.urlopen(req)
         ok = False
         try:

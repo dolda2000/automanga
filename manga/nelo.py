@@ -15,7 +15,7 @@ class page(lib.page):
         self.iurl = url
 
     def open(self):
-        return lib.stdimgstream(self.iurl)
+        return lib.stdimgstream(self.iurl, referer=self.chapter.url)
 
     def __str__(self):
         return self.name
