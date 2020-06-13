@@ -139,10 +139,10 @@ def main():
     else:
         libname = "local"
         try:
-            if len(args) > 0:
-                mdir = args.pop(0)
-            else:
-                mdir = "."
+            if len(args) < 1:
+                usage(sys.stderr)
+                sys.exit(1)
+            mdir = args.pop(0)
             mng = manga.local.manga(mdir)
         except TypeError:
             sys.stderr.write("automanga: not a valid manga directory: %s\n" % mdir)
