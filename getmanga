@@ -6,6 +6,7 @@ from PIL import Image
 
 verbose = 0
 wait = 10
+getnames = False
 
 def msg(vl, msg, *args):
     if verbose >= vl:
@@ -27,16 +28,20 @@ def digits(num):
 
 def autoname(page):
     ret = ""
+    inames = []
     for t, i in page.stack:
+        if ret:
+            inames.append((t, ret))
         if ret:
             ret += "-"
         ret += "%0*i" % (digits(len(t) + 1), i + 1)
-    return ret
+    return ret, inames
 
 def expand(pattern, page):
     ret = ""
     si = 0
     fp = 0
+    inames = []
     stack = list(zip([t for t, i in page.stack], [t for t, i in page.stack[1:]] + [page], [i for t, i in page.stack]))
     while True:
         p = pattern.find('%', fp)
@@ -45,7 +50,7 @@ def expand(pattern, page):
                 sys.stderr.write("getmanga: pattern %s did not match page %s\n" %
                                  (pattern, "/".join(c.name for t, c, i in stack)))
                 sys.exit(1)
-            return ret + pattern[fp:]
+            return ret + pattern[fp:], inames
         ret += pattern[fp:p]
         m = pattern[p + 1:p + 2]
         fp = p + 2
@@ -67,15 +72,46 @@ def expand(pattern, page):
             else:
                 sys.stderr.write("getmanga: %s: unknown specifier `%s'\n" % (pattern, m))
                 sys.exit(1)
+            if si < len(stack):
+                inames.append((ct, ret))
+
+checkednames = None
+def checknames(tdir, names):
+    global checkednames
+    nmpath = os.path.join(tdir, "names")
+    if checkednames is None:
+        checkednames = {}
+        if os.path.exists(nmpath):
+            with open(nmpath) as fp:
+                for line in fp:
+                    line = line.strip()
+                    p = line.find(' ')
+                    if p < 0: continue
+                    checkednames[line[:p]] = line[p + 1:]
+    for t, prefix in names:
+        if not prefix: continue
+        if ' ' not in prefix and prefix not in checkednames:
+            with manga.profile.txfile(nmpath, "w") as fp:
+                if '\n' not in t.name:
+                    checkednames[prefix] = t.name
+                    msg(1, "adding name %s for %s" % (t.name, prefix))
+                else:
+                    checkednames[prefix] = ""
+                    sys.stderr.write("getmanga: warning: node names contains newlines: %r\n" % (t.name,))
+                for prefix, name in checkednames.items():
+                    if not name: continue
+                    fp.write("%s %s\n" % (prefix, name))
 
 def download(mng, tdir, pattern):
     exts = ["", ".jpg", ".jpeg", ".png", ".gif"]
     fmts = {"PNG": "png", "JPEG": "jpeg", "GIF": "gif"}
     for page in manga.lib.cursor(mng):
         if pattern is None:
-            nm = autoname(page)
+            nm, inames = autoname(page)
         else:
-            nm = expand(pattern, page)
+            nm, inames = expand(pattern, page)
+        if getnames:
+            checknames(tdir, inames)
         path = os.path.join(tdir, nm)
         if any(os.path.exists(path + ext) for ext in exts):
             msg(2, "%s exists, skipping", nm)
@@ -110,16 +146,16 @@ def download(mng, tdir, pattern):
         time.sleep(cwait)
 
 def usage(out):
-    out.write("usage: getmanga [-hv] [-w WAIT] [-p PROFILE] [-P PATTERN] DIRECTORY [LIBRARY ID]\n")
+    out.write("usage: getmanga [-hvn] [-w WAIT] [-p PROFILE] [-P PATTERN] DIRECTORY [LIBRARY ID]\n")
     out.write("\tpattern templates:\n")
     out.write("\t  %i\tSequence number\n")
     out.write("\t  %n\tName\n")
     out.write("\t  %d\tID\n")
 
 def main():
-    global verbose, wait, mprof, props
+    global verbose, wait, mprof, props, getnames
 
-    opts, args = getopt.getopt(sys.argv[1:], "hvp:w:P:")
+    opts, args = getopt.getopt(sys.argv[1:], "hvnp:w:P:")
     profnm = None
     pattern = None
     for o, a in opts:
@@ -130,6 +166,8 @@ def main():
             profnm = a
         elif o == "-v":
             verbose += 1
+        elif o == "-n":
+            getnames = True
         elif o == "-w":
             wait = int(a)
         elif o == "-P":
