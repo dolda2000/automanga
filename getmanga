@@ -198,6 +198,9 @@ def main():
     else:
         profile = manga.profile.profile.byname(profnm)
 
+    if props.get("getnames", "") == "yes":
+        getnames = True
+
     if len(args) == 2:
         usage(sys.stderr)
         sys.exit(1)
