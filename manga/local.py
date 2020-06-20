@@ -32,6 +32,27 @@ def genstr(s):
             ret += [part]
     return ret
 
+def findname(names, files):
+    matches = list(names.keys())
+    for f in files:
+        matches = [pfx for pfx in matches if f.startswith(pfx)]
+        if len(matches) < 1: return None
+    matches.sort(key=len, reverse=True)
+    return names[matches[0]]
+
+def prefixes(path):
+    nmpath = pj(path, "names")
+    if not os.path.exists(nmpath):
+        return {}
+    ret = {}
+    with open(nmpath, "r") as fp:
+        for line in fp:
+            line = line.strip()
+            p = line.find(' ')
+            if p < 0: continue
+            ret[line[:p]] = line[p + 1:]
+    return ret
+
 class imgstream(lib.imgstream):
     def __init__(self, path):
         self.bk = open(path, 'rb')
@@ -136,6 +157,7 @@ class manga(lib.manga):
             structs.sort(key=lambda o: "".join(o[1][len(mx):]))
             for i in reversed(var):
                 structs.sort(key=lambda o: int(o[1][i]))
+        readnames = prefixes(self.path)
         def constree(p, structs, idx):
             if idx == len(var):
                 pages = []
@@ -159,7 +181,8 @@ class manga(lib.manga):
                         id = "".join(st[var[idx]:])
                         ret.append(page(self, pj(self.path, orig[nm]), id, id, p.stack + [(p, len(ret))]))
                     else:
-                        cur = interm(id, id, p.stack + [(p, len(ret))], [])
+                        name = findname(readnames, [nm for (nm, st) in sub]) or id
+                        cur = interm(name, id, p.stack + [(p, len(ret))], [])
                         cur.direct = constree(cur, sub, idx + 1)
                         ret.append(cur)
                 return ret
