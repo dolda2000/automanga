@@ -117,7 +117,20 @@ def download(mng, tdir, pattern):
             msg(2, "%s exists, skipping", nm)
             continue
         msg(1, "getting %s...", nm)
-        with page.open() as fp:
+        retries = 0
+        while True:
+            try:
+                fp = page.open()
+                break
+            except OSError as error:
+                if retries < 5:
+                    sys.stderr.write("getmanga: warning: error when getting %s: %s\n" % (nm, error))
+                    retries += 1
+                    time.sleep(60)
+                else:
+                    sys.stderr.write("getmanga: error when getting %s: %s\n" % (nm, error))
+                    sys.exit(1)
+        with fp:
             with open(path, "wb") as out:
                 done = False
                 try:
