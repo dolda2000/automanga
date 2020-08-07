@@ -4,9 +4,6 @@ import sys, getopt
 import manga.lib, manga.reader, manga.profile, manga.local
 from gi.repository import Gtk, Gdk, GObject
 
-GObject.threads_init()
-Gdk.threads_init()
-
 def usage(out):
     out.write("usage: automanga [-h] [-p PROFILE] {DIRECTORY|-l LIBRARY ID|-a ALIAS}\n")
     out.write("       automanga -a ALIAS=LIBRARY:ID\n")
