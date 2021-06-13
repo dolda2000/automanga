@@ -1,6 +1,5 @@
-import os
+import os, pathlib
 from . import lib
-pj = os.path.join
 
 def decode1(nm):
     ret = []
@@ -41,11 +40,11 @@ def findname(names, files):
     return names[matches[0]]
 
 def prefixes(path):
-    nmpath = pj(path, "names")
-    if not os.path.exists(nmpath):
+    nmpath = path/"names"
+    if not nmpath.exists():
         return {}
     ret = {}
-    with open(nmpath, "r") as fp:
+    with nmpath.open("r") as fp:
         for line in fp:
             line = line.strip()
             p = line.find(' ')
@@ -55,7 +54,7 @@ def prefixes(path):
 
 class imgstream(lib.imgstream):
     def __init__(self, path):
-        self.bk = open(path, 'rb')
+        self.bk = path.open("rb")
         self.clen = os.fstat(self.bk.fileno()).st_size
 
     def close(self):
@@ -108,17 +107,17 @@ class manga(lib.manga):
     exts = ["jpg", "jpeg", "png", "gif"]
 
     def __init__(self, path):
-        path = os.path.abspath(path)
-        if not os.path.isdir(path):
+        path = path.resolve()
+        if not path.is_dir():
             raise IOError("No such directory: " + path)
         self.path = path
-        self.id = path
+        self.id = os.fspath(path)
         self.stack = []
-        if os.path.exists(pj(self.path, "name")):
-            with open(pj(self.path, "name")) as s:
+        if (self.path/"name").exists():
+            with (self.path/"name").open("r") as s:
                 self.name = s.readline().strip()
         else:
-            self.name = os.path.basename(path)
+            self.name = path.name
         self.direct = self.destruct()
 
     def __len__(self):
@@ -128,11 +127,11 @@ class manga(lib.manga):
         return self.direct[idx]
 
     def imglist(self):
-        if os.path.exists(pj(self.path, "order")):
-            with open(pj(self.path, "order")) as s:
-                return True, [line.strip() for line in s if os.path.exists(pj(self.path, line.strip()))]
+        if (self.path/"order").exists():
+            with (self.path/"order").open("r") as s:
+                return True, [line.strip() for line in s if (self.path/line.strip()).exists()]
         else:
-            return False, [dent for dent in os.listdir(self.path) if '.' in dent and dent[dent.rindex('.') + 1:] in self.exts]
+            return False, [dent for dent in (dent.name for dent in self.path.iterdir()) if '.' in dent and dent[dent.rindex('.') + 1:] in self.exts]
 
     def bakenames(self, files):
         ret = []
@@ -163,7 +162,7 @@ class manga(lib.manga):
                 pages = []
                 for nm, st in structs:
                     id = "".join(st[len(mx):])
-                    pages.append(page(self, pj(self.path, orig[nm]), id, id, p.stack + [(p, len(pages))]))
+                    pages.append(page(self, self.path/orig[nm], id, id, p.stack + [(p, len(pages))]))
                 return pages
             else:
                 ids = set()
@@ -179,7 +178,7 @@ class manga(lib.manga):
                     if len(sub) == 1:
                         nm, st = sub[0]
                         id = "".join(st[var[idx]:])
-                        ret.append(page(self, pj(self.path, orig[nm]), id, id, p.stack + [(p, len(ret))]))
+                        ret.append(page(self, self.path/orig[nm], id, id, p.stack + [(p, len(ret))]))
                     else:
                         name = findname(readnames, [nm for (nm, st) in sub]) or id
                         cur = interm(name, id, p.stack + [(p, len(ret))], [])
@@ -190,31 +189,32 @@ class manga(lib.manga):
 
 class dumb(lib.library):
     def byid(self, id):
-        if not os.path.isdir(id):
+        path = pathlib.Path(id)
+        if not path.is_dir():
             raise KeyError(id)
-        return manga(id)
+        return manga(path)
 
 class directory(dumb):
     def __init__(self, path):
-        if not os.path.isdir(path):
+        if not path.is_dir():
             raise IOError("No such directory: " + path)
         self.path = path
 
     def byname(self, prefix):
         ret = []
         prefix = prefix.lower()
-        for dent in os.listdir(self.path):
-            if dent[:len(prefix)].lower() == prefix:
-                ret.append(manga(pj(self.path, dent)))
+        for dent in self.path.iterdir():
+            if dent.name[:len(prefix)].lower() == prefix:
+                ret.append(manga(dent))
         return ret
 
     def search(self, expr):
         expr = expr.lower()
-        return [manga(pj(self.path, dent)) for dent in os.listdir(self.path) if expr in dent.lower()]
+        return [manga(dent) for dent in self.path.iterdir() if expr in dent.name.lower()]
 
     def __iter__(self):
-        for dent in os.listdir(self.path):
-            yield manga(pj(self.path, dent))
+        for dent in self.path.iterdir():
+            yield manga(dent)
 
 
 library = dumb

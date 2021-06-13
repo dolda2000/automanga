@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import sys, getopt
+import sys, getopt, pathlib
 import manga.lib, manga.reader, manga.profile, manga.local
 from gi.repository import Gtk, Gdk, GObject
 
@@ -140,7 +140,7 @@ def main():
                 usage(sys.stderr)
                 sys.exit(1)
             mdir = args.pop(0)
-            mng = manga.local.manga(mdir)
+            mng = manga.local.manga(pathlib.Path(mdir))
         except TypeError:
             sys.stderr.write("automanga: not a valid manga directory: %s\n" % mdir)
             sys.exit(1)
