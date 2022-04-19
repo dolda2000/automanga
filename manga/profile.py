@@ -219,6 +219,12 @@ class filemanga(manga):
                 else:
                     f.write(consline("lset", key, *val) + "\n")
 
+    def mtime(self):
+        try:
+            return os.stat(self.path).st_mtime
+        except FileNotFoundError:
+            return 0
+
 class profile(object):
     def __init__(self, dir):
         self.dir = dir
