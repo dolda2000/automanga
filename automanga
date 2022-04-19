@@ -9,7 +9,7 @@ def usage(out):
     out.write("       automanga -a ALIAS=LIBRARY:ID\n")
     out.write("       automanga -t {DIRECTORY|-l LIBRARY ID|-a ALIAS} [-]TAG...\n")
     out.write("       automanga -{s|S} LIBRARY NAME\n")
-    out.write("       automanga -L TAG\n")
+    out.write("       automanga -L TAG [-o ORDER]\n")
 
 libname = None
 search = None
@@ -17,7 +17,8 @@ profile = ""
 alias = None
 settags = False
 listtag = None
-opts, args = getopt.getopt(sys.argv[1:], "hl:sSp:a:tL:")
+listorder = None
+opts, args = getopt.getopt(sys.argv[1:], "hl:sSp:a:tL:o:")
 for o, a in opts:
     if o == "-h":
         usage(sys.stdout)
@@ -39,6 +40,8 @@ for o, a in opts:
         settags = True
     elif o == "-L":
         listtag = a
+    elif o == "-o":
+        listorder = a
 if profile == "":
     try:
         profile = manga.profile.profile.last()
@@ -75,6 +78,7 @@ def main():
 
     if listtag is not None:
         if profile is not None:
+            results = []
             for mprof in profile.bytag(listtag):
                 try:
                     mng = mprof.open()
@@ -84,7 +88,20 @@ def main():
                 except Exception as exc:
                     sys.stderr.write("%s %s: unexpected error: %s\n" % (mprof.libnm, mprof.id, str(exc)))
                     continue
-                sys.stdout.write("%s %s: \"%s\"\n" % (mprof.libnm, mprof.id, mng.name))
+                line = "%s %s: \"%s\"" % (mprof.libnm, mprof.id, mng.name)
+                if listorder is None:
+                    sys.stdout.write("%s\n" % (line,))
+                else:
+                    if listorder == "mtime":
+                        key = -mprof.mtime()
+                    else:
+                        sys.stderr.write("automanga: undefined order: %s\n" % (listorder,))
+                        sys.exit(1)
+                    results.append((line, key))
+            if len(results) > 0:
+                results.sort(key=lambda o: o[1])
+                for line, key in results:
+                    sys.stdout.write("%s\n" % (line,))
         return
 
     if alias and (alias.find('=') > 0):
