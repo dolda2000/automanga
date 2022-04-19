@@ -81,6 +81,9 @@ def main():
                 except KeyError:
                     sys.stderr.write("%s %s: no longer found\n" % (mprof.libnm, mprof.id))
                     continue
+                except Exception as exc:
+                    sys.stderr.write("%s %s: unexpected error: %s\n" % (mprof.libnm, mprof.id, str(exc)))
+                    continue
                 sys.stdout.write("%s %s: \"%s\"\n" % (mprof.libnm, mprof.id, mng.name))
         return
 
