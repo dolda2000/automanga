@@ -1,14 +1,20 @@
 import os, pathlib
 from . import lib
 
+def pdigit(s):
+    for c in s:
+        if c not in "0123456789.":
+            return False
+    return True
+
 def decode1(nm):
     ret = []
     p = 0
     while p < len(nm):
-        if nm[p].isdigit():
+        if pdigit(nm[p]):
             s = p
             p += 1
-            while p < len(nm) and nm[p].isdigit():
+            while p < len(nm) and pdigit(nm[p]):
                 p += 1
             ret += [nm[s:p]]
         elif nm[p].isalpha():
@@ -25,7 +31,7 @@ def decode1(nm):
 def genstr(s):
     ret = []
     for part in s:
-        if part.isdigit():
+        if pdigit(part):
             ret += [int]
         else:
             ret += [part]
@@ -155,7 +161,7 @@ class manga(lib.manga):
         if not ordered:
             structs.sort(key=lambda o: "".join(o[1][len(mx):]))
             for i in reversed(var):
-                structs.sort(key=lambda o: int(o[1][i]))
+                structs.sort(key=lambda o: o[1][i])
         readnames = prefixes(self.path)
         def constree(p, structs, idx):
             if idx == len(var):
