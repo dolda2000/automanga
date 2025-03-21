@@ -103,8 +103,8 @@ def checknames(tdir, names):
                     fp.write("%s %s\n" % (prefix, name))
 
 def download(mng, tdir, pattern):
-    exts = ["", ".jpg", ".jpeg", ".png", ".gif"]
-    fmts = {"PNG": "png", "JPEG": "jpeg", "GIF": "gif"}
+    exts = ["", ".jpg", ".jpeg", ".png", ".gif", "webp"]
+    fmts = {"PNG": "png", "JPEG": "jpeg", "GIF": "gif", "WEBP": "webp"}
     for page in manga.lib.cursor(mng):
         if pattern is None:
             nm, inames = autoname(page)
