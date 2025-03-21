@@ -110,7 +110,7 @@ def maxstruct(flist):
     return mx
 
 class manga(lib.manga):
-    exts = ["jpg", "jpeg", "png", "gif"]
+    exts = ["jpg", "jpeg", "png", "gif", "webp"]
 
     def __init__(self, path):
         path = path.resolve()
