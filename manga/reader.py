@@ -188,6 +188,7 @@ class pageview(gtk.Widget):
         self.zoom = 1.0
         self.interp = gdkpix.InterpType.HYPER
         self.off = 0, 0
+        self.initoff = None
 
     def get_osize(self):
         return self.pixbuf.get_width(), self.pixbuf.get_height()
@@ -242,6 +243,10 @@ class pageview(gtk.Widget):
             if zh >= ah and oy + ah > zh:
                 oy = zh - ah
             self.off = ox, oy
+        if self.initoff is not None:
+            initoff = self.initoff
+            self.initoff = None
+            self.set_aoff(initoff)
         if self.get_realized():
             self.get_window().move_resize(alloc.x, alloc.y, alloc.width, alloc.height)
 
@@ -285,6 +290,17 @@ class pageview(gtk.Widget):
         if oy < 0: oy = 0
         self.off = ox, oy
         self.queue_draw()
+
+    def set_aoff(self, off):
+        if self.get_realized():
+            aw, ah = self.get_asize()
+            zw, zh = self.get_zsize()
+            ox = round(off[0] * (zw - aw)) if zw > aw else 0
+            oy = round(off[1] * (zh - ah)) if zh > ah else 0
+            self.off = ox, oy
+            self.queue_draw()
+        else:
+            self.initoff = off
 
     def set_zoom(self, zoom):
         if not isinstance(zoom, str): zoom = float(zoom)
@@ -520,6 +536,7 @@ class reader(gtk.Window):
 
         self.manga = manga
         self.page = None
+        self.nextaoff = None
         self.sboxes = []
         self.point = None
 
@@ -595,6 +612,9 @@ class reader(gtk.Window):
                 if zmode == "fit":
                     zmode = "minfit"
                 self.page.set_zoom(zmode)
+            if self.nextaoff:
+                self.page.set_aoff(self.nextaoff)
+                self.nextaoff = None
             self.pfr.add(self.page)
             self.page.show()
         self.updpagelbl()
@@ -674,11 +694,13 @@ class reader(gtk.Window):
                 if self.page and self.page.off[1] + self.page.get_asize()[1] < self.page.get_zsize()[1]:
                     self.pan((0, self.page.get_asize()[1] - 50))
                 else:
+                    self.nextaoff = (0, 0)
                     self.fetchpage(self.point.next, lambda page: self.preload.set(preload(relpageget(page, False, self.cache))))
             elif ev.keyval in [65288]:
                 if self.page and self.page.off[1] > 0:
                     self.pan((0, -(self.page.get_asize()[1] - 50)))
                 else:
+                    self.nextaoff = (0, 1)
                     self.fetchpage(self.point.prev, lambda page: self.preload.set(preload(relpageget(page, True, self.cache))))
             elif ev.keyval in [ord('R'), ord('r')]:
                 page = self.point.cur.cur
