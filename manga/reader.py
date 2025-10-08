@@ -184,7 +184,7 @@ class pageview(gtk.Widget):
         super(pageview, self).__init__()
         self.pixbuf = pixbuf
         self.zoomed = None, None
-        self.fit = True
+        self.autozoom = "minfit"
         self.zoom = 1.0
         self.interp = gdkpix.InterpType.HYPER
         self.off = 0, 0
@@ -219,15 +219,20 @@ class pageview(gtk.Widget):
     def get_preferred_height(self):
         return 0, max(min(self.get_osize()[1], 4096), 0)
 
-    def fitzoom(self):
+    def calczoom(self, mode):
         w, h = self.get_osize()
         alloc = self.get_allocation()
-        return min(float(alloc.width) / float(w), float(alloc.height) / float(h))
+        if mode == "minfit":
+            return min(float(alloc.width) / float(w), float(alloc.height) / float(h))
+        elif mode == "maxfit":
+            return max(float(alloc.width) / float(w), float(alloc.height) / float(h))
+        else:
+            raise ValueError(mode)
 
     def do_size_allocate(self, alloc):
         self.set_allocation(alloc)
-        if self.fit:
-            self.zoom = self.fitzoom()
+        if self.autozoom:
+            self.zoom = self.calczoom(self.autozoom)
         else:
             aw, ah = self.get_asize()
             zw, zh = self.get_zsize()
@@ -245,7 +250,7 @@ class pageview(gtk.Widget):
         pz, zbuf = self.zoomed
         if pz != zoom:
             w, h = self.get_osize()
-            zbuf = self.pixbuf.scale_simple(int(w * zoom), int(h * zoom), self.interp)
+            zbuf = self.pixbuf.scale_simple(round(w * zoom), round(h * zoom), self.interp)
             self.zoomed = zoom, zbuf
         return zbuf
 
@@ -282,7 +287,7 @@ class pageview(gtk.Widget):
         self.queue_draw()
 
     def set_zoom(self, zoom):
-        if zoom is not None: zoom = float(zoom)
+        if not isinstance(zoom, str): zoom = float(zoom)
         aw, ah = self.get_asize()
         zw, zh = self.get_zsize()
         dw, dh = zw - aw, zh - ah
@@ -290,11 +295,11 @@ class pageview(gtk.Widget):
         xa = float(ox) / float(dw) if dw > 0 else 0.5
         ya = float(oy) / float(dh) if dh > 0 else 0.5
 
-        if zoom is None:
-            self.fit = True
-            self.zoom = self.fitzoom()
+        if isinstance(zoom, str):
+            self.autozoom = zoom
+            self.zoom = self.calczoom(zoom)
         else:
-            self.fit = False
+            self.autozoom = None
             self.zoom = zoom
 
         zw, zh = self.get_zsize()
@@ -550,7 +555,7 @@ class reader(gtk.Window):
             self.fetchpage(pageget(self.manga))
         self.updtitle()
 
-    zmode = profprop("zmode", "fit")
+    zmode = profprop("zmode", "minfit")
     curpage = profprop("curpage")
 
     def updpagelbl(self):
@@ -582,9 +587,14 @@ class reader(gtk.Window):
             self.page = None
         if img is not None:
             self.page = pageview(img)
-            if self.zmode == "1":
-                self.page.set_zoom(1)
+            if self.zmode.startswith("="):
+                self.page.set_zoom(float(self.zmode[1:]))
                 self.page.set_off((0, 0))
+            else:
+                zmode = self.zmode
+                if zmode == "fit":
+                    zmode = "minfit"
+                self.page.set_zoom(zmode)
             self.pfr.add(self.page)
             self.page.show()
         self.updpagelbl()
@@ -632,14 +642,17 @@ class reader(gtk.Window):
         if self.page is not None:
             if ev.keyval in [ord('O'), ord('o')]:
                 self.zoom = 1.0
-                self.zmode = "1"
-            elif ev.keyval in [ord('P'), ord('p')]:
-                self.zoom = None
-                self.zmode = "fit"
+                self.zmode = "=1"
+            elif ev.keyval in [ord('p')]:
+                self.zoom = self.zmode = "minfit"
+            elif ev.keyval in [ord('P')]:
+                self.zoom = self.zmode = "maxfit"
             elif ev.keyval in [ord('[')]:
-                self.zoom = min(self.zoom * 1.25, 3)
+                self.zoom /= (2 ** 0.25)
+                self.zmode = "=" + str(self.zoom)
             elif ev.keyval in [ord(']')]:
-                self.zoom /= 1.25
+                self.zoom = min(self.zoom * (2 ** 0.25), 4)
+                self.zmode = "=" + str(self.zoom)
             elif ev.keyval in [ord('h')]:
                 self.pan((-100, 0))
             elif ev.keyval in [ord('j')]:
