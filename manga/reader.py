@@ -706,6 +706,23 @@ class reader(gtk.Window):
                 page = self.point.cur.cur
                 del self.cache[page]
                 self.imgfetch.set(imgfetch(self.cache[page]))
+            else:
+                for i, (next, prev) in enumerate([('1', '!'), ('2', '@'), ('3', '#'), ('4', '$'), ('5', '%')]):
+                    if ev.keyval in [ord(next), ord(prev)]:
+                        page = self.point.cur.cur
+                        if i >= len(page.stack):
+                            break
+                        node, cidx = page.stack[i]
+                        if ev.keyval == ord(next):
+                            idx = cidx + 1
+                            if idx >= len(node):
+                                break
+                        else:
+                            idx = cidx - 1
+                            if idx < 0:
+                                break
+                        self.fetchpage(pageget(node[idx]))
+                        break
 
     def quit(self):
         self.hide()
