@@ -709,6 +709,10 @@ class reader(gtk.Window):
             else:
                 for i, (next, prev) in enumerate([('1', '!'), ('2', '@'), ('3', '#'), ('4', '$'), ('5', '%')]):
                     if ev.keyval in [ord(next), ord(prev)]:
+                        if ev.keyval == ord(next) and (ev.state & gdk.ModifierType.CONTROL_MASK):
+                            if i < len(self.sboxes):
+                                self.sboxes[i].popup()
+                            break
                         page = self.point.cur.cur
                         if i >= len(page.stack):
                             break
