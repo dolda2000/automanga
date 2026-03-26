@@ -255,7 +255,7 @@ class pageview(gtk.Widget):
         pz, zbuf = self.zoomed
         if pz != zoom:
             w, h = self.get_osize()
-            zbuf = self.pixbuf.scale_simple(round(w * zoom), round(h * zoom), self.interp)
+            zbuf = self.pixbuf.scale_simple(max(round(w * zoom), 1), max(round(h * zoom), 1), self.interp)
             self.zoomed = zoom, zbuf
         return zbuf
 
