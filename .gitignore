@@ -1,2 +1,4 @@
 /build
+/dist
+/automanga.egg-info
 *.pyc
