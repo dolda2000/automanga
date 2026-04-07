@@ -7,6 +7,6 @@ name = "automanga"
 version = "1"
 description = "Automanga"
 
-[tool.setuputils]
+[tool.setuptools]
 packages = ["manga"]
-scripts = ["automanga", "getmanga"]
+script-files = ["automanga", "getmanga"]
